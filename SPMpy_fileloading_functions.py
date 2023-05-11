@@ -59,14 +59,14 @@
 #
 #
 # ## 5. Gwyddion 2D image to PANDAS Dataframe or Xarray
-# ### 5.1. gwy_image2df : gwy file name 
+# ### 5.1. gwy_img2df : gwy file name 
 # * Gwyddion data container to PANDAS DataFrame
 # * input: *.gwy file
 #     * gwyddion 2D image data (*gwy) $\to $ numpy $\to $  pd.DataFrame(_df)
 # * output: PANDAS DataFrame
 #     
 #
-# ### 5.2. gwy_df_channel2xr : Choose a data channe in gwy_df 
+# ### 5.2. gwy_df_ch2xr : Choose a data channe in gwy_df 
 # * Gwyddion data container to Xarray DataArray
 # * input: gwy_df dataframe & channel number ( N=0)
 #     * pd.DataFrame(_df) $\to $  xarray Dataset (_xr)
@@ -1378,7 +1378,6 @@ def grid_line2xr(griddata_file, center_offset = True):
     return grid_xr
 
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
 # ## <font color=blue>5. Gwyddion 2D image to PANDAS Dataframe or Xarray </font>
 # ### 5.1. gwy_image2df 
 # * convert to df 
@@ -1389,7 +1388,7 @@ def grid_line2xr(griddata_file, center_offset = True):
 #
 
 # +
-def gwy_image2df (gwy_file_name):
+def gwy_img2df (gwy_file_name):
     import pandas as pd
     try:
         import gwyfile
@@ -1406,7 +1405,7 @@ def gwy_image2df (gwy_file_name):
 
 
 # +
-def gwy_df_channel2xr (gwy_df, ch_N=0): 
+def gwy_df_ch2xr (gwy_df, ch_N=0): 
     import pandas as pd
     #convert a channel data to xr DataArray format
     chN_df = gwy_df.iloc[:,ch_N]
