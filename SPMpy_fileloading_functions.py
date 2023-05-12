@@ -102,33 +102,18 @@ except ModuleNotFoundError:
     # !pip install xrft 
     import xrft
 
+
 # + jp-MarkdownHeadingCollapsed=true
 ###########################################
 # Create and display a FileChooser widget #
 ###########################################
-file_chooser = FileChooser('')
-display(file_chooser)
-
-# +
-#####################################
-# show the selected path & filename #
-#####################################
-
-defalut_folder = r"C:\Users\gkp\OneDrive - Oak Ridge National Laboratory\mK STM DATA\2023\0503 NbSe2_PtIrtip2_LHeT_Jewook"
-print("folder_path = ", file_chooser.selected_path)
-print("selected file name = ",file_chooser.selected_filename)
-folder_path = file_chooser.selected_path
-
-currentPath = os.getcwd() #get current path
-print ("Current Path = ", os.getcwd()) # print current path 
-
-
-
-# + [markdown] jp-MarkdownHeadingCollapsed=true
-# ## <font color=blue>1. Check file_list (DataFrame) </font>
+#file_chooser = FileChooser('')
+#display(file_chooser)
 # -
 
-def files_in_folder(path): 
+# ## <font color=blue>1. Check file_list (DataFrame) </font>
+
+def files_in_folder(path_input): 
     """
     
 
@@ -151,7 +136,7 @@ def files_in_folder(path):
     currentPath = os.getcwd() #get current path
     print ("Current Path = ", os.getcwd()) # print current path 
     #######################################
-    working_folder = path
+    working_folder = path_input
     # copy & paste the "SPM data file" location (folder(path)) 
     os.chdir(working_folder)
     print ("Changed Path = ", os.getcwd()) 
@@ -217,9 +202,6 @@ def files_in_folder(path):
 
     return file_list_df
 
-file_list_df = files_in_folder(folder_path)
-
-# + [markdown] jp-MarkdownHeadingCollapsed=true
 # ## <font color=blue>2. Image to xarray</font>
 
 # +
@@ -372,9 +354,15 @@ def img2xr (loading_sxm_file, center_offset = False):
     # 'LI' & 'X' in  channel name (signal.keys) 
     LIX_key = [s  for s in Scan.signals.keys()  if "LI"  in s  if "X" in s ]
     print(LIX_key)
-    # 0 is fwd, 1 is bwd 
-    LIX_fwd  = Scan.signals[LIX_key[0]]['forward']
-    LIX_bwd  = Scan.signals[LIX_key[0]]['backward'][:,::-1]
+    # chech the LIX is empty or not 
+    if len(LIX_key) == 0: 
+        print("LIX is empty, Current ch substitutes LIX ")
+        LIX_fwd  = Scan.signals['Current']['forward']
+        LIX_bwd  = Scan.signals['Current']['backward'][:,::-1]
+    else:
+        # 0 is fwd, 1 is bwd 
+        LIX_fwd  = Scan.signals[LIX_key[0]]['forward']
+        LIX_bwd  = Scan.signals[LIX_key[0]]['backward'][:,::-1]
 
     #LIX_fwd = Scan.signals['LI_Demod_1_X']['forward']
     #LIX_bwd = Scan.signals['LI_Demod_1_X']['backward'][:,::-1]
@@ -971,13 +959,12 @@ def grid2xr(griddata_file, center_offset = True):
     
     return grid_xr
 
+# -
 
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
 # ## <font color=blue>4. Grid Line to xarray </font>
 #
 #
-# -
 
 def grid_line2xr(griddata_file, center_offset = True): 
 

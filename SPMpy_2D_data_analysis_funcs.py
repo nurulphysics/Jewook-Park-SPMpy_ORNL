@@ -53,7 +53,7 @@ import matplotlib.patches as patches
 
 import seaborn as sns
 
-from SPMpy_2D_data_analysis_funcs import files_in_folde,img2xr,grid2xr,gridline2xr,gwy_img2df,gwy_df_ch2xr
+#from SPMpy_2D_data_analysis_funcs import files_in_folder,img2xr,grid2xr,gridline2xr,gwy_img2df,gwy_df_ch2xr
 
 # some packages may be yet to be installed
 try:
