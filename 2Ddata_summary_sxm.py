@@ -269,7 +269,8 @@ for files_name in files_df.file_name:
     left = Inches(0)
     top = Inches(1)
 
-    spm_data_plot = xr_isns_plot_r_space(plane_fit_x_xr(plane_fit_y_xr(spmdata_xr)), figsize= (5,6))
+    spm_data_plot = xr_isns_plot_r_space(plane_fit_x_xr(plane_fit_y_xr(spmdata_xr)),
+                                         figsize= (5,6))
     spm_data_plot.savefig('spm_data_plot_temp.png', 
                           bbox_inches='tight', dpi = 300)
 
