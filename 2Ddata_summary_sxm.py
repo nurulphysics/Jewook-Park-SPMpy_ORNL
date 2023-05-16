@@ -54,7 +54,8 @@ try:
     from ipyfilechooser import FileChooser
 except ModuleNotFoundError:
     warn("ModuleNotFoundError: No module named ipyfilechooser")
-    # %from ipyfilechooser import FileChooser
+    # !pip install ipyfilechooser 
+    from ipyfilechooser import FileChooser
 
 try:
     import xrft
@@ -130,6 +131,42 @@ except ModuleNotFoundError:
     warn("ModuleNotFoundError: No module named xrft")
     # !pip install xrft
     import xrft
+    
+
+try:
+    import holoviews as hv
+except ModuleNotFoundError:
+    warn('ModuleNotFoundError: No module named holoviews')
+    # !pip install holoviews 
+    import holoviews as hv
+
+try:
+    import seaborn_image as isns
+except ModuleNotFoundError:
+    warn('ModuleNotFoundError: No module named seaborn_image')
+    # !conda install -c conda-forge seaborn-image
+    import seaborn_image as isns
+    
+    
+    
+try:
+    import hvplot.xarray
+    import hvplot.pandas 
+except ModuleNotFoundError:
+    warn('ModuleNotFoundError: No module named hvplot')
+    # !pip install hvplot
+    import hvplot.xarray
+    import hvplot.pandas 
+
+
+
+try:
+    import gwyfile
+except ModuleNotFoundError:
+    warn('ModuleNotFoundError: No module named gwyfile')
+    # !pip install gwyfile
+    import gwyfile
+ 
 # -
 
 
@@ -292,8 +329,11 @@ for files_name in files_df.file_name:
 
 
 #pptx page 
-# -
+# +
+nap
 
+
+# -
 
 
 

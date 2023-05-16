@@ -749,6 +749,141 @@ def  grid_lineNpks_offset(xr_data_l_pks,
     return xr_data_l_pks_ch_slct, ch_l_name_df, ch_l_name_pks_df, fig
 
 
+def  grid_lineNpks_offset(xr_data_l_pks, 
+                          ch_l_name = 'LIX_unit_calc',
+                          plot_y_offset= 2E-11, 
+                          peak_LIX_min = 1E-13, 
+                          fig_size = (6,8), 
+                          legend_title = None):
+    # add peak point one-by-one (no palett func in sns)
+    #  after find peak & padding
+    # use choose the channel to offset-plot 
+    # use the plot_y_offset to adjust the offset values 
+    ch_l_name = ch_l_name
+    ch_l_pk_name = ch_l_name +'_peaks_pad'
+    line_direction = xr_data_l_pks.line_direction
+    plot_y_offset  =  plot_y_offset
+    
+    sns_color_palette = "rocket"
+    #color map for fig
+    
+    #xr_data_l_pks
+    ### prepare XR dataframe for line spectroscopy plot 
+    xr_data_l_pks_ch_slct = xr_data_l_pks[[ch_l_name,ch_l_pk_name]]
+    # choose the 2 channels from 2nd derivative (to maintain the coords info) 
+
+
+    #line_direction check again 
+    
+    if xr_data_l_pks.line_direction == 'Y': 
+        spacing = xr_data_l_pks_ch_slct.Y_spacing
+    elif xr_data_l_pks.line_direction == 'X': 
+        spacing = xr_data_l_pks_ch_slct.X_spacing
+    else : 
+        print('check direction & X or Y spacing for offset') 
+
+    xr_data_l_pks_ch_slct['offset'] = (xr_data_l_pks_ch_slct[line_direction] - xr_data_l_pks_ch_slct[line_direction].min())/spacing
+    # prepare offset index channnel 
+    print (' plot_y_offset  to adjust line-by-line spacing')
+
+    xr_data_l_pks_ch_slct[ch_l_name+'_offset'] = xr_data_l_pks_ch_slct[ch_l_name] + plot_y_offset * xr_data_l_pks_ch_slct['offset']
+    # offset the curve b
+    print (xr_data_l_pks_ch_slct)
+    
+
+    ch_l_name_df_list = [] 
+    ch_l_name_pks_df_list = []
+    # prepare empty list to append dataframes in the for - loop (y_i or x_i)
+
+    #line_direction check again 
+    #########################
+    # line_diection check
+    if xr_data_l_pks_ch_slct.line_direction == 'Y': 
+        lines  = xr_data_l_pks_ch_slct.Y
+
+        for y_i, y_points in enumerate (lines):
+
+            # set min peak height (LIX amplitude =  resolution limit)
+
+            y_i_pks  = xr_data_l_pks_ch_slct[ch_l_pk_name].isel(Y = y_i).dropna(dim='peaks').astype('int32')
+            # at (i_th )Y position, select peak index for bias_mV
+            real_pks_mask = (xr_data_l_pks_ch_slct.isel(Y = y_i, bias_mV = y_i_pks.values)[ch_l_name] > peak_LIX_min).values
+            # prepare a 'temp' mask for each Y position 
+            y_i_pks_slct =  y_i_pks.where(real_pks_mask).dropna(dim='peaks').astype('int32')
+            # y_i_pks_slct with mask selection  
+
+            ch_l_name_y_i_df = xr_data_l_pks_ch_slct[ch_l_name+'_offset'].isel(Y = y_i).to_dataframe()
+            # LIX_offset  at Y_i position 
+            ch_l_name_df_list.append(ch_l_name_y_i_df)
+            
+            ch_l_name_y_i_pks_df = xr_data_l_pks_ch_slct.isel(Y = y_i, bias_mV = y_i_pks_slct.values)[ch_l_name+'_offset'].to_dataframe()
+            # selected peaks with offest Y 
+            ch_l_name_pks_df_list.append(ch_l_name_y_i_pks_df)
+            
+            # data at selected Y, & peak position, LIX_offset
+            
+    #########################
+    # line_diection check
+
+    elif xr_data_l_pks_ch_slct.line_direction == 'X': 
+        lines = xr_data_l_pks_ch_slct.X
+
+        for x_i, x_points in enumerate (lines):
+
+            # set min peak height (LIX amplitude =  resolution limit)
+
+            x_i_pks  = xr_data_l_pks_ch_slct[ch_l_pk_name].isel(X = x_i).dropna(dim='peaks').astype('int32')
+            # at (i_th )X position, select peak index for bias_mV
+            real_pks_mask = (xr_data_l_pks_ch_slct.isel(X = x_i, bias_mV = x_i_pks.values)[ch_l_name] > peak_LIX_min).values
+            # prepare a 'temp' mask for each X position 
+            x_i_pks_slct =  x_i_pks.where(real_pks_mask).dropna(dim='peaks').astype('int32')
+            # x_i_pks_slct with mask selection  
+
+            ch_l_name_x_i_df = xr_data_l_pks_ch_slct[ch_l_name+'_offset'].isel(X = x_i).to_dataframe()
+            # LIX_offset  at X_i position 
+            ch_l_name_df_list.append(ch_l_name_x_i_df)
+            ch_l_name_x_i_pks_df = xr_data_l_pks_ch_slct.isel(X = x_i, bias_mV = x_i_pks_slct.values)[ch_l_name+'_offset'].to_dataframe()
+            ch_l_name_pks_df_list.append(ch_l_name_x_i_pks_df)
+            
+            # selected peaks with offest X 
+            
+    else : 
+        print('check direction & X or Y spacing for offset') 
+    
+    ch_l_name_df = pd.concat(ch_l_name_df_list).reset_index()
+    ch_l_name_pks_df = pd.concat(ch_l_name_pks_df_list).reset_index()
+    
+    fig,ax = plt.subplots(figsize = fig_size)
+
+    sns.lineplot(data = ch_l_name_df,
+                         x ='bias_mV', 
+                         y = ch_l_name+'_offset',
+                         palette = "rocket",
+                         hue = xr_data_l_pks.line_direction,
+                         ax = ax)
+
+    sns.scatterplot(data = ch_l_name_pks_df,
+                            x ='bias_mV',
+                            y = ch_l_name+'_offset',
+                            palette ="rocket",
+                            hue = xr_data_l_pks.line_direction,
+                    s =0,
+                            ax = ax)
+    # legend control!( cut the handles 1/2)
+    ax.set_xlabel('Bias (mV)')   
+    #ax.set_ylabel(ch_l_name+'_offset')   
+    ax.set_ylabel('LDOS')   
+    handles0, labels0 = ax.get_legend_handles_labels()
+    labels1 = [ str(float(label)*10) for label in labels0[:int(len(labels0)//2)] ] 
+    # convert the line length as nm  
+    ax.legend(handles0[:int(len(handles0)//2)],
+              labels1, title = legend_title)
+    # use the half of legends (line + scatter) --> use lines only
+    #plt.show()
+    return xr_data_l_pks_ch_slct, ch_l_name_df, ch_l_name_pks_df, fig
+
+
+
 
 
 

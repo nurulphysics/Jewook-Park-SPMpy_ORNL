@@ -940,7 +940,8 @@ isns.imshow(z_LIX_fNb_xr_butterworth.z_fwd_df_butterworth, origin = "lower")
 '''
 
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
+# -
+
 # # 5. rank filteres functions 
 # > To use "skimage.filters.rank ", input data type should be uint8/uint16
 # > * $\to$ image_to_grayscale (convert image as (0,255))
@@ -1070,8 +1071,8 @@ def filter_gs_substract_mean_xr (xrdata_gs,disk_radious=10):
     return xrdata_gs_sub_mean
 
 # test
+# -
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
 # # 6. Image Thresholding functions 
 # > *  Threshold selections + boolean 
 # > * treshold_flip = True : boolean T/F selection
