@@ -255,7 +255,411 @@ grid_3D = grid_xr[['I_fb','LIX_fb']]
 # averaged I & LIX 
 # -
 
-grid_3D.I_fb.isel(X=0,Y=0).plot()
+# ## numerical derivative + Savitzky-Golay filter smoothing
+#
+#
+
+# grid_3D -> sg -> derivative 
+grid_3D_sg = savgolFilter_xr(grid_3D, window_length = 21, polyorder = 3)
+grid_3D_sg_1deriv = grid_3D_sg.differentiate('bias_mV')
+grid_3D_sg_1deriv_sg = savgolFilter_xr(grid_3D_sg_1deriv, window_length = 21, polyorder = 3)
+grid_3D_sg_2deriv = grid_3D_sg_1deriv_sg.differentiate('bias_mV')
+grid_3D_sg_2deriv_sg =  savgolFilter_xr(grid_3D_sg_2deriv, window_length = 21, polyorder = 3)
+
+# +
+# Test  figure drawing 
+# -
+
+fig,axes =  plt.subplots (ncols = 2, figsize = (6,1), sharex = True)
+axs = axes.ravel()
+grid_3D.I_fb.isel(X=0,Y=0).plot(ax =axs[0])
+grid_3D.LIX_fb.isel(X=0,Y=0).plot(ax = axs[1])
+
+# ### Tolerence to find plateau
+
+# set tolerance for I_fb * LIX_fb
+tolerance_I, tolerance_dIdV, tolerance_d2IdV2 = 1E-10,1E-10,1E-10
+tolerance_LIX, tolerance_dLIXdV , tolerance_d2LIXdV2  = 1E-11,1E-11,1E-11
+
+# +
+x_i = 11
+y_j = 20 
+
+
+
+fig,axes =  plt.subplots (ncols = 2, figsize = (6,3), sharex = True)
+axs = axes.ravel()
+
+# for I_fb
+grid_3D.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[0])
+axs[0].axhline(y=tolerance_I, c='orange') # pos tolerance line
+axs[0].axhline(y=-tolerance_I, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[0].fill_between(grid_3D.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
+                   where=abs(grid_3D.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+# for LIX_fb
+grid_3D.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[1])
+axs[1].axhline(y=tolerance_LIX, c='orange') # pos tolerance line
+axs[1].axhline(y=-tolerance_LIX, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[1].fill_between(grid_3D.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                   where=abs(grid_3D.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+
+
+
+
+
+# +
+# use the selected point  
+# x_i,y_j = 11, 20
+# draw I & LIX, 1st derivative, 2nd derivative 
+# draw tolerance value for I &LIX 
+# fill between yellow, cyan, magenta to marking 0th, 1st, 2nd derivative plateau
+
+
+tolerance_I= 1E-10
+tolerance_LIX = 1E-11
+
+tolerance_dIdV, tolerance_d2IdV2 = tolerance_I * 2,tolerance_I * 3
+tolerance_dLIXdV , tolerance_d2LIXdV2 = tolerance_LIX * 2, tolerance_LIX * 3
+x_i, y_j = 11, 20 
+
+fig,axes =  plt.subplots (ncols = 2, nrows=3 , figsize = (6,9), sharex = True)
+axs = axes.ravel()
+
+# for I_fb
+grid_3D.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[0])
+axs[0].axhline(y=tolerance_I, c='orange') # pos tolerance line
+axs[0].axhline(y=-tolerance_I, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[0].fill_between(grid_3D.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
+                   where=abs(grid_3D.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+axs[2].fill_between(grid_3D.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
+                   where=abs(grid_3D.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+# fill area with yellow where the I_fb is plateau in dIdV curve
+axs[4].fill_between(grid_3D.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
+                   where=abs(grid_3D.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+# fill area with yellow where the I_fb is plateau in d2Id2V curve
+axs[0].set_ylim((-tolerance_I*10, tolerance_I*10))#set ylimit for magnification
+
+
+# for LIX_fb
+grid_3D.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[1])
+axs[1].axhline(y=tolerance_LIX, c='orange') # pos tolerance line
+axs[1].axhline(y=-tolerance_LIX, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[1].fill_between(grid_3D.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                   where=abs(grid_3D.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+
+axs[3].fill_between(grid_3D.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                   where=abs(grid_3D.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+# fill area with yellow where the LIX_fb is plateau in dIdV curve
+
+axs[5].fill_between(grid_3D.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                   where=abs(grid_3D.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+# fill area with yellow where the LIX_fb is plateau in dIdV curve
+
+axs[1].set_ylim((-tolerance_LIX*10, tolerance_LIX*10))#set ylimit for magnification
+
+
+
+# for I_fb after 1st derivative + smoothing 
+# dI/dV
+grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[2])
+axs[2].axhline(y=tolerance_dIdV, c='orange') # pos tolerance line
+axs[2].axhline(y=-tolerance_dIdV, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[2].fill_between(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dIdV, tolerance_dIdV, 
+                   where=abs(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_dIdV,
+                   facecolor='cyan', interpolate=True, alpha=0.3)
+
+axs[4].fill_between(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dIdV, tolerance_dIdV, 
+                   where=abs(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_dIdV,
+                   facecolor='cyan', interpolate=True, alpha=0.3)
+
+axs[0].fill_between(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dIdV, tolerance_dIdV, 
+                   where=abs(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_dIdV,
+                   facecolor='cyan', interpolate=True, alpha=0.3)
+
+# fill area with cyan where the dIdV is plateau in d2Id2V curve
+
+axs[2].set_ylim((-tolerance_dIdV*10, tolerance_dIdV*10))#set ylimit for magnification
+axs[2].set_ylabel("dIdV")
+
+
+# for LIX_fb after 1st derivative + smoothing 
+# d(LIX)/dV
+grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[3])
+
+axs[3].axhline(y=tolerance_dLIXdV, c='orange') # pos tolerance line
+axs[3].axhline(y=-tolerance_dLIXdV, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[3].fill_between(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
+                   where=abs(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
+                   facecolor='cyan', interpolate=True, alpha=0.3)
+
+axs[5].fill_between(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
+                   where=abs(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
+                   facecolor='cyan', interpolate=True, alpha=0.3)
+axs[1].fill_between(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
+                   where=abs(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
+                   facecolor='cyan', interpolate=True, alpha=0.3)
+# fill area with cyan where the dLIXdV is plateau in d2Id2V curve
+
+
+axs[3].set_ylim((-tolerance_dLIXdV*10, tolerance_dLIXdV*10))#set ylimit for magnification
+axs[3].set_ylabel("dLIXdV")
+
+# for I_fb after 2nd derivative + smoothing 
+# d2I/dV2
+grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[4])
+axs[4].axhline(y=tolerance_d2IdV2, c='orange') # pos tolerance line
+axs[4].axhline(y=-tolerance_d2IdV2, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[4].fill_between(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2IdV2, tolerance_d2IdV2, 
+                   where=abs(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2IdV2,
+                   facecolor='magenta', interpolate=True, alpha=0.3)
+axs[0].fill_between(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2IdV2, tolerance_d2IdV2, 
+                   where=abs(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2IdV2,
+                   facecolor='magenta', interpolate=True, alpha=0.3)
+axs[2].fill_between(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2IdV2, tolerance_d2IdV2, 
+                   where=abs(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2IdV2,
+                   facecolor='magenta', interpolate=True, alpha=0.3)
+
+
+axs[4].set_ylim((-tolerance_d2IdV2*10, tolerance_d2IdV2*10))#set ylimit for magnification
+axs[4].set_ylabel("d2IdV2")
+
+
+
+# for LIX_fb after 2nd derivative + smoothing 
+# d2(LIX)/dV2
+grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[5])
+
+axs[5].axhline(y=tolerance_d2LIXdV2, c='orange') # pos tolerance line
+axs[5].axhline(y=-tolerance_d2LIXdV2, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[5].fill_between(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
+                   where=abs(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
+                   facecolor='magenta', interpolate=True, alpha=0.3)
+
+axs[1].fill_between(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
+                   where=abs(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
+                   facecolor='magenta', interpolate=True, alpha=0.3)
+axs[3].fill_between(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
+                   where=abs(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
+                   facecolor='magenta', interpolate=True, alpha=0.3)
+
+axs[5].set_ylim((-tolerance_d2LIXdV2*10, tolerance_d2LIXdV2*10))#set ylimit for magnification
+axs[5].set_ylabel("d2LIXdV2")
+
+## how to draw a pixels 
+
+
+
+
+
+
+fig.tight_layout()
+# -
+
+# ### according to the plateau detection 
+# #### dIdV or dLIx/dV is acceptable for plateau detection for SC gap 
+
+# +
+# extract plateau regions from data. 
+
+grid_3D_sg["I_fb"+'_plateau'] = abs(grid_3D_sg.I_fb.isel(X=0,Y=0)) <= tolerance_I
+grid_3D_sg["I_fb"+'_dIdV_plateau'] = abs(grid_3D_sg_1deriv_sg.I_fb.isel(X=0,Y=0)) <= tolerance_dIdV
+grid_3D_sg["I_fb"+'_d2IdV2_plateau'] = abs(grid_3D_sg_2deriv_sg.I_fb.isel(X=0,Y=0)) <= tolerance_d2IdV2
+
+grid_3D_sg["LIX_fb"+'_plateau'] = abs(grid_3D_sg.LIX_fb.isel(X=0,Y=0)) <= tolerance_LIX
+grid_3D_sg["LIX_fb"+'_dIdV_plateau'] = abs(grid_3D_sg_1deriv_sg.LIX_fb.isel(X=0,Y=0)) <= tolerance_dLIXdV
+grid_3D_sg["LIX_fb"+'_d2IdV2_plateau'] = abs(grid_3D_sg_2deriv_sg.LIX_fb.isel(X=0,Y=0)) <= tolerance_d2LIXdV2
+
+# grid_3D_sg*_**_plateau ; bools T or F
+
+
+# -
+
+def find_plateau(xr_data,tolerance_I=1E-10 , tolerance_LIX = 1E-11,apply_SGfilter = False):
+    xr_data_prcssd = xr_data.copy(deep = True)
+    print('Find plateau in I &LIX each points')
+    if apply_SGfilter == True :
+        print('import savgolFilter_xr in advance' )
+        xr_data_sg = savgolFilter_xr(xr_data, window_length = 21, polyorder = 3)
+        for data_ch in xr_data_sg:
+            if 'I_fb' in data_ch:
+                xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data_sg[data_ch]) <= tolerance_I  
+            else :#except 'I_fb' all is LIX result , use tolerance_LIX
+                xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data_sg[data_ch] ) <= tolerance_LIX
+
+    else:
+        print(' check plateau without smoothing (Savatzky-Golay filter)' )
+        
+    # savatzky golay filter & derivative using xr API
+    for data_ch in xr_data:
+        if 'I_fb' in data_ch:
+            xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data[data_ch]) <= tolerance_I  
+        else :#except 'I_fb' all is LIX result , use tolerance_LIX
+            xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data[data_ch] ) <= tolerance_LIX
+
+    return xr_data_prcssd
+
+
+
+grid_3D_plateau = find_plateau(grid_3D)
+
+grid_3D_sg_1deriv_sg_plateau = find_plateau(grid_3D_sg_1deriv_sg)
+grid_3D_sg_1deriv_sg_plateau
+
+grid_3D_sg_pks= find_peaks_xr(grid_3D_sg)
+grid_3D_sg_pks_pad = peak_pad( grid_3D_sg_pks)
+
+# +
+# indicate peak position 
+
+#grid_3D_sg_pks.I_fb.isel(X=1,Y=1, bias_mV = 
+
+grid_3D_sg_pks.I_fb_peaks.isel(X=1,Y=1).values.tolist()
+#  extract the isel bias_mV values 
+
+
+
+
+
+# +
+bias_mV_pks = grid_3D_sg_pks.I_fb.isel(X=1,Y=1).bias_mV.isel(bias_mV = grid_3D_sg_pks.I_fb_peaks.isel(X=1,Y=1).values.tolist())
+grid_3D_sg_pks.I_fb.isel(X=1,Y=1).bias_mV.isin(bias_mV_pks)
+
+# do the samething for the all X,Y positions 
+
+# -
+
+grid_3D_sg_pks.I_fb.isel(X=1,Y=1).isel(bias_mV = grid_3D_sg_pks.I_fb_peaks.isel(X=1,Y=1).values.tolist())
+
+#grid_3D_sg_pks.I_fb.bias_mV.isin(grid_3D_sg_pks.I_fb_peaks.isel(X=1,Y=1).values.tolist())
+
+
+def find_peak_properties_xr(xrdata): 
+    from scipy.signal import find_peaks
+    xrdata_prcssd = xrdata.copy(deep = True)
+    print('Find peaks in STS to an xarray Dataset.')
+
+    for data_ch in xrdata:
+        if len(xrdata[data_ch].dims)==2:
+            # smoothing filter only for the 3D data set
+                    # ==> updated             
+            
+            
+
+            ### 2D data case 
+            ### assume that coords are 'X','Y','bias_mV'
+            #### two case X,bias_mV or Y,bias_mV 
+            if 'X' in xrdata[data_ch].dims :
+                # xrdata is X,bias_mV 
+                # use the isel(X = x) 
+                x_axis = xrdata.X.size
+
+                #print(xrdata_prcssd[data_ch])
+
+                xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
+                    np.array([ find_peaks(xrdata[data_ch].isel(X = x).values)
+                              for x in range(x_axis)], dtype = object )[:,1],
+                dims=["X"],
+                coords={"X": xrdata.X})
+            
+            elif 'Y' in xrdata[data_ch].dims :
+                # xrdata is Y,bias_mV 
+                # use the isel(Y = y) 
+                y_axis = xrdata.Y.size
+
+                #print(xrdata_prcssd[data_ch])
+
+                xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
+                    np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values)
+                              for y in range(y_axis)], dtype = object )[:,1],
+                dims=["Y"],
+                coords={"Y": xrdata.Y})
+            
+            # ==> updated 
+            
+        elif len(xrdata[data_ch].dims) == 3:
+            
+            x_axis = xrdata.X.size
+            y_axis = xrdata.Y.size
+            print (data_ch)
+            """xrdata_prcssd[data_ch+'_peaks']= xr.DataArray(np.ones((xAxis,yAxis), dtype = object),
+                                                             dims=["X", "Y"],
+                                                             coords={"X": xrdata.X, "Y": xrdata.Y} )"""
+            xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
+                np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values)[1] 
+                          for x in range(x_axis)  
+                          for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis),
+                dims=["X", "Y"],
+                coords={"X": xrdata.X, "Y": xrdata.Y})         
+        elif len(xrdata[data_ch].dims) == 1:
+            if 'bias_mV' in xrdata.dims: 
+                for data_ch in xrdata: 
+                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch]))
+        else : pass
+    return xrdata_prcssd
+#grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
+
+grid_3D_sg_pk_prps = find_peak_properties_xr(grid_3D_sg)
+
+import scipy as sp
+peaks = sp.signal.find_peaks(grid_3D_sg['I_fb'].isel(X = 1, Y = 1).values)[0]
+
+sp.signal.peak_prominences(grid_3D_sg['I_fb'].isel(X = 1, Y = 1).values,peaks)
+
+grid_3D_sg_pk_prps.I_fb_peaks.isel(X=1,Y=1)
+
+
+# grid_3D -> sg -> derivative 
+grid_3D_sg = savgolFilter_xr(grid_3D, window_length = 15, polyorder = 3)
+grid_3D_sg_1deriv = grid_3D_sg.differentiate('bias_mV')
+grid_3D_sg_1deriv_sg = savgolFilter_xr(grid_3D_sg_1deriv, window_length = 15, polyorder = 3)
+grid_3D_sg_2deriv = grid_3D_sg_1deriv_sg.differentiate('bias_mV')
+grid_3D_sg_2deriv_sg =  savgolFilter_xr(grid_3D_sg_2deriv, window_length = 15, polyorder = 3)
+
+# ### I peak detection 
+# * 1. I peak  =  dIdV plateau & dI/DV Pos
+# * 2. I peak = d2IdV2 local min  ==> -d2IdV2 peak position 
+#
+# ### LDOS peak detection 
+#
+# * 1. LIX peak detection 
+# * 2. dLIXdV plateau & dLIX/dV2 Pos
+# * 4. LIX peak = d2IdV2 local min  ==> -d2IdV2 peak position 
+#
+# #### make a function 
+#
+# def find_plateau (xrdata, tolerance_I = 1E-10, tolerance_LIX= 1E-11): 
+#
+#
+# xr_data 에 대해서 모든  point 에 대해서 plateau 를 찾기 
+# tolerance  는 각각 I 와 LIX 기준 다르게 
+#
+# 1차 미분값을 기준으로 plateau 잡기 
+#
+#
+
+# +
+#
+#
+grid_3D_sg
+
+
+# -
 
 grid_3D_gap = grid_3D_Gap(grid_3D)
 # assign gap from STS

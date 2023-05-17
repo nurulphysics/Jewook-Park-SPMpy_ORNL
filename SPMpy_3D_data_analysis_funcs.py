@@ -194,6 +194,94 @@ def grid_3D_Gap(grid_3D, I_0_pA = 1E-13 ,LIX_0_pA = 1E-14):
 #test
 #grid_3D_gap = grid_3D_Gap(grid_3D)
 #grid_3D_gap
+# +
+def grid_3D_SC(grid_3D, I_0_pA = 1E-13 ,LIX_0_pA = 1E-14):
+    # get plateau area 
+    # tolerance for I & LIX
+    
+    # extract tolerance 
+    # clustering ==> representative value 
+    # peak detection --> peak height , peak width, peak 
+    grid_3D_prcssd = grid_3D.copy(deep = True)
+    # I_fb values less than I_min_A => zero value 
+    I_0_pA = I_0_pA
+
+    gap_mask_I  = np.abs(grid_3D.I_fb) < I_0_pA
+    gap_I =  grid_3D.I_fb.where(gap_mask_I)
+
+    CBM_I_mV = grid_3D.bias_mV.where(gap_mask_I).max('bias_mV') # CBM_I_mV
+    VBM_I_mV = grid_3D.bias_mV.where(gap_mask_I).min('bias_mV') # VBM_I_mV
+    # map of the CBM&VBM energy (bias_mV)   
+    gap_size_I =  (CBM_I_mV - VBM_I_mV ) 
+    # from VBM to CBM energy gap size in mV ( index differnce * bias_mV step size) 
+
+    grid_3D_prcssd['CBM_I_mV'] = CBM_I_mV
+    grid_3D_prcssd['VBM_I_mV'] = VBM_I_mV
+    grid_3D_prcssd['gap_size_I'] = gap_size_I
+    ###############################################
+
+    grid_3D['dIdV'] = grid_3D.differentiate(coord = 'bias_mV').I_fb
+    # numerically calculated dI/dV from I_fb
+    LIX_ratio = grid_3D.dIdV / grid_3D.LIX_fb
+       
+    grid_3D['LIX_unit_calc'] = np.abs( LIX_ratio.mean())*grid_3D.LIX_fb
+    # LIX unit calibration 
+    # pA unit : lock-in result 
+    # LIX_unit_calc : calibrated as [A/V] unit for dI/dV
+    
+    
+    # LIX_fb values less than LIX_min_A => zero value 
+    # LIX_0_pA = LIX_0_pA
+    LIX_0_AV  =  LIX_0_pA * LIX_ratio.mean()
+    # calibrated LIX resolution limit
+    gap_mask_LIX  = np.abs(grid_3D.LIX_unit_calc) < LIX_0_AV
+    # gap_mask_LIX  = np.abs(grid_3D.LIX_fb) > LIX_0_pA
+    # because of the same coefficient ('LIX_ratio.mean()')
+    # range for CBM &VBM is not different between  LIX_unit_calc & LIX_fb
+    # 3D mask 
+
+    LIX_unit_calc_offst = grid_3D.dIdV.where(gap_mask_I).mean()- grid_3D['LIX_unit_calc'].where(gap_mask_I).mean()
+    # possible LIX offset adjust (based on dI/dV calc value)
+    grid_3D_prcssd['LDOS_fb'] = grid_3D.LIX_unit_calc + LIX_unit_calc_offst
+    # assign dI/dV value at I=0  as a reference offset 
+    # grid_3D['LDOS_fb'] is calibrated dIdV with correct unit ([A/V]) for LDOS 
+    # LDOS_fb is proportional to the real LDOS
+    # here we dont consider the matrix element for
+    grid_3D_prcssd['CBM_LIX_mV'] = grid_3D.bias_mV.where(gap_mask_LIX).max('bias_mV').fillna(0)
+    
+    #CBM_I_mV = grid_3D.bias_mV.where(gap_mask_I).max('bias_mV') # CBM_I_mV
+
+    
+    grid_3D_prcssd['VBM_LIX_mV'] = grid_3D.bias_mV.where(gap_mask_LIX).min('bias_mV').fillna(0)
+    # CBM& VBM bias_mV value ,  fill nan as (0)
+    gap_size_LIX = grid_3D_prcssd.CBM_LIX_mV - grid_3D_prcssd.VBM_LIX_mV
+    grid_3D_prcssd['gap_size_LIX'] = gap_size_LIX
+    # cf) use the 'isin' to find zero & find the index with 'np.argwhere'
+
+    # (c.f) to fill the VBM, 
+    #grid_3D_prcssd['VBM_LIX'] = grid_3D.LIX_fb.where(gap_mask_LIX).fillna(10000).argmin(dim = 'bias_mV')
+    # apply find gap_mask_LIX(gapped area), fill 'nan' as -10000 & find argmax 
+    #grid_3D_prcssd['VBM_LIX'] = grid_3D.VBM_LIX.where(~gap_mask_LIX).fillna(np.argwhere(grid_3D_prcssd.bias_mV.isin(0).values)[0,0])
+    # for the metallic area (~gap_mask_LIX), fill the bias_mV index of 'zero_bias'
+    #grid_3D_prcssd['VBM_LIX']=  grid_3D_prcssd['VBM_LIX'].astype(np.int64)
+    # the same dtype as np.int64
+    grid_3D_prcssd.attrs['I[A]_limit'] = I_0_pA
+    grid_3D_prcssd.attrs['LDOS[A/V]_limit'] = LIX_0_AV.values
+    
+    ## split  LIX_fb_offst as a CB & VB region 
+    
+    grid_3D_prcssd['LDOS_fb_CB'] =  grid_3D_prcssd.LDOS_fb.where(
+        grid_3D_prcssd.bias_mV  >  grid_3D_prcssd.CBM_LIX_mV
+    )
+    grid_3D_prcssd['LDOS_fb_VB'] =  grid_3D_prcssd.LDOS_fb.where(
+        grid_3D_prcssd.bias_mV  <  grid_3D_prcssd.VBM_LIX_mV
+    )
+    
+    return grid_3D_prcssd
+
+#test
+#grid_3D_gap = grid_3D_Gap(grid_3D)
+#grid_3D_gap
 # -
 # # Signal Treatments 
 # * Assume that the coords in Xarray are 'X",'Y','bias_mV'
@@ -275,6 +363,35 @@ def savgolFilter_xr(xrdata,window_length=7,polyorder=3):
 
 # -
 
+def find_plateau(xr_data,tolerance_I=1E-10 , tolerance_LIX = 1E-11,apply_SGfilter = False):
+    xr_data_prcssd = xr_data.copy(deep = True)
+    print('Find plateau in I &LIX each points')
+    if apply_SGfilter == True :
+        print('import savgolFilter_xr in advance' )
+        xr_data_sg = savgolFilter_xr(xr_data, window_length = 21, polyorder = 3)
+        for data_ch in xr_data_sg:
+            if 'I_fb' in data_ch:
+                xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data_sg[data_ch]) <= tolerance_I  
+            elif 'LIX_fb' in data_ch:
+                xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data_sg[data_ch] ) <= tolerance_LIX
+               
+            else: pass #except 'I_fb' & 'LIX_fb' just pass
+
+    else:
+        print(' check plateau without smoothing (Savatzky-Golay filter)' )
+        
+    # savatzky golay filter & derivative using xr API
+    for data_ch in xr_data:
+        if 'I_fb' in data_ch:
+            xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data[data_ch]) <= tolerance_I  
+        elif 'LIX_fb' in data_ch:       
+            xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data[data_ch] ) <= tolerance_LIX
+            
+        else : pass #except 'I_fb' & 'LIX_fb' just pass
+    return xr_data_prcssd
+
+
+
 def find_peaks_xr(xrdata): 
     from scipy.signal import find_peaks
     xrdata_prcssd = xrdata.copy(deep = True)
@@ -283,7 +400,7 @@ def find_peaks_xr(xrdata):
     for data_ch in xrdata:
         if len(xrdata[data_ch].dims)==2:
             # smoothing filter only for the 3D data set
-                    # ==> updaded             
+                    # ==> updated             
             
             
 
@@ -328,6 +445,71 @@ def find_peaks_xr(xrdata):
                                                              coords={"X": xrdata.X, "Y": xrdata.Y} )"""
             xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
                 np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values)[0] 
+                          for x in range(x_axis)  
+                          for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis),
+                dims=["X", "Y"],
+                coords={"X": xrdata.X, "Y": xrdata.Y})         
+        elif len(xrdata[data_ch].dims) == 1:
+            if 'bias_mV' in xrdata.dims: 
+                for data_ch in xrdata: 
+                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch]))
+        else : pass
+    return xrdata_prcssd
+#grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
+
+def find_peak_properties_xr(xrdata): 
+    from scipy.signal import find_peaks
+    xrdata_prcssd = xrdata.copy(deep = True)
+    print('Find peaks in STS to an xarray Dataset.')
+
+    for data_ch in xrdata:
+        if len(xrdata[data_ch].dims)==2:
+            # smoothing filter only for the 3D data set
+                    # ==> updated             
+            
+            
+
+            ### 2D data case 
+            ### assume that coords are 'X','Y','bias_mV'
+            #### two case X,bias_mV or Y,bias_mV 
+            if 'X' in xrdata[data_ch].dims :
+                # xrdata is X,bias_mV 
+                # use the isel(X = x) 
+                x_axis = xrdata.X.size
+
+                #print(xrdata_prcssd[data_ch])
+
+                xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
+                    np.array([ find_peaks(xrdata[data_ch].isel(X = x).values)
+                              for x in range(x_axis)], dtype = object )[:,1],
+                dims=["X"],
+                coords={"X": xrdata.X})
+            
+            elif 'Y' in xrdata[data_ch].dims :
+                # xrdata is Y,bias_mV 
+                # use the isel(Y = y) 
+                y_axis = xrdata.Y.size
+
+                #print(xrdata_prcssd[data_ch])
+
+                xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
+                    np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values)
+                              for y in range(y_axis)], dtype = object )[:,1],
+                dims=["Y"],
+                coords={"Y": xrdata.Y})
+            
+            # ==> updated 
+            
+        elif len(xrdata[data_ch].dims) == 3:
+            
+            x_axis = xrdata.X.size
+            y_axis = xrdata.Y.size
+            print (data_ch)
+            """xrdata_prcssd[data_ch+'_peaks']= xr.DataArray(np.ones((xAxis,yAxis), dtype = object),
+                                                             dims=["X", "Y"],
+                                                             coords={"X": xrdata.X, "Y": xrdata.Y} )"""
+            xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
+                np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values)[1] 
                           for x in range(x_axis)  
                           for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis),
                 dims=["X", "Y"],
