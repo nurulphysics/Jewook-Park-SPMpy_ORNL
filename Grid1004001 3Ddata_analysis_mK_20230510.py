@@ -229,7 +229,7 @@ files_df = files_in_folder(folder_path)
 # ## 1-2. 3ds file loading to analyze
 
 files_df[files_df.type=='3ds']#.file_name.iloc[0]
-grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[4])
+grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[0])
 
 grid_xr
 
@@ -298,6 +298,9 @@ dmap.opts(colorbar = True,
           cmap = 'bwr',
           frame_width = 400).relabel('X - bias_mV plane slicing: ')
 
+
+# ## Smoothing 
+# ### Savatzky-Golay smoothig
 
 # +
 
@@ -583,13 +586,212 @@ grid_3D_bbox
 # +
 grid_3D_bbox_pk = grid3D_line_avg_pks (grid_3D_bbox,average_in= 'Y', ch_l_name= 'LIX_fb')
 #grid_3D_crop_pk
-xr_data_l_pks_ch_slct, ch_l_name_df, ch_l_name_pks_df, fig = grid_lineNpks_offset(grid_3D_bbox_pk,peak_LIX_min=2E-14,plot_y_offset=5E-11)
+xr_data_l_pks_ch_slct, ch_l_name_df, ch_l_name_pks_df, fig = grid_lineNpks_offset(grid_3D_bbox_pk,peak_LIX_min=2E-14,plot_y_offset=5E-10)
 
 
-fig.savefig('grid3T_10004001_l_pf.png')
+fig.savefig('grid0T_still2mA_10004001_l_pf.png')
 # -
 
+#grid_3D_gap
+grid_3D_gap.CBM_LIX_mV.plot()
+
+
+# # <font color= orange > 3. Signal Treatments </font>
+#
+
+# ## Smoothing 
+# ### Savatzky-Golay smoothig
+
+import panel as pn
+import panel.widgets as pnw
+import ipywidgets as ipw
+
+# +
+
+grid_3D_sg = savgolFilter_xr(grid_3D, window_length = 7, polyorder = 3)
+## savatzk-golay filtered 
+
+# -
+
+# ## Numerical Derivatives
+# ### xarray APIs
+
+# grid_3D -> sg -> derivative 
+grid_3D_sg = savgolFilter_xr(grid_3D, window_length = 21, polyorder = 3)
+grid_3D_sg_1deriv = grid_3D_sg.differentiate('bias_mV')
+grid_3D_sg_1deriv_sg = savgolFilter_xr(grid_3D_sg_1deriv, window_length = 21, polyorder = 3)
+grid_3D_sg_2deriv = grid_3D_sg_1deriv_sg.differentiate('bias_mV')
+
+# +
+######################
+# to check grid_3D_sg
+######################
+
+grid_3D_sg_2deriv_hv = hv.Dataset(grid_3D_sg_2deriv.LIX_fb)
+# convert xr dataset as a holoview dataset 
+###############
+# bias_mV slicing
+dmap_plane  = ["X","Y"]
+
+dmap = grid_3D_sg_2deriv_hv.to(hv.Image,
+                     kdims = dmap_plane,
+                     dynamic = True )
+dmap.opts(colorbar = True,
+          cmap = 'bwr',
+          frame_width = 400,
+          aspect = 'equal').relabel('XY plane slicing: ')
+fig = hv.render(dmap)
+dmap   
+
+# +
+
+###############
+# X slicing
+dmap_plane  = ["bias_mV","Y"]
+dmap = grid_3D_sg_2deriv_hv.to(hv.Image,
+                     kdims = dmap_plane,
+                     dynamic = True )
+dmap.opts(colorbar = True,
+          cmap = 'bwr',
+          frame_width = 400).relabel('Y - bias_mV plane slicing: ')
+# -
+
+grid_3D_sg_2deriv
+np.save ("grid_3D_sg_2deriv_LIX_unit_cal.npy", grid_3D_sg_2deriv.LIX_unit_calc.values)
+
+LIX_unit_calc_curve = hv.Curve(grid_3D_sg.isel(X = sliderX.value, Y = sliderY.value).LIX_unit_calc).opts(axiswise=True, ylabel='LDOS (A/V)', title = 'LDOS')
+d_LIX_unit_calc_curve_dV =  hv.Curve(grid_3D_sg_1deriv.isel(X = sliderX.value, Y = sliderY.value).LIX_unit_calc).opts(axiswise=True, ylabel='LDOS (A/V)', title = 'd(LDOS)/dV')
+d2_LIX_unit_calc_curve_dV2 = hv.Curve(grid_3D_sg_2deriv.isel(X = sliderX.value, Y = sliderY.value).LIX_unit_calc).opts(axiswise=True, ylabel='LDOS (A/V)', title = 'd2(LDOS)/dV2')
+dmap*points + LIX_unit_calc_curve + d_LIX_unit_calc_curve_dV + d2_LIX_unit_calc_curve_dV2
+
+# ## find peaks 
+# * function find_peaks_xr
+#
+#
+# ## Handling peaks with different numbers
+#     * use the np.pad & count the max number of peak
+#     * fill the np.nan the empty
+#     * function : peak_pad
+#
+#
+#
+
+# +
+grid_3D_sg_pks = find_peaks_xr(grid_3D_sg)
+#grid_3D_sg_pks.LIX_fb_peaks
+
+grid_3D_sg_pks_pad = peak_pad(grid_3D_sg_pks)
+grid_3D_sg_pks_pad
+
+# -
+
+# ### counting peaks for after derivatives
+# * original data : grid_3D
+# * find gap data : grid_3D_gap
+# * smoothing data : grid_3D_gap_sg
+# * derivative data : grid_3D_gap_sg_1deriv, grid_3D_gap_sg_2deriv
+# * find_peaks : grid_3D_sg_1deriv_sg_pks
+# * find_peaks& padding : grid_3D_sg_1deriv_sg_pks_pad
+#
+# ### LDOS in data
+# * grid_3D_gap_sg
+# ### for the peaks in LDOS
+# * grid_3D_sg_pks_pad
+# ### d(LDOS)/dV IETS
+# * grid_3D_sg_1deriv_sg
+# * peaks & dips in IETS : d2I/dV2 values
+# * grid_3D_sg_1deriv_sg_pks_pad
+# * grid_3D_sg_1deriv_sg_dps_pad
+#
+# ### To find LDOS peaks 
+# *  2nd derivative LDOS dips! (for acurate detection)
+# * grid_3D_sg_2deriv_sg
+#     * grid_3D_sg_2deriv_sg_pks_pad
+#     * grid_3D_sg_2deriv_sg_dps_pad
+
+# +
+# grid_3D -> sg -> derivative 
+grid_3D_sg = savgolFilter_xr(grid_3D, window_length = 31, polyorder = 3)
+grid_3D_sg_1deriv = grid_3D_sg.differentiate('bias_mV')
+grid_3D_sg_1deriv_sg = savgolFilter_xr(grid_3D_sg_1deriv, window_length = 31, polyorder = 3)
+grid_3D_sg_2deriv = grid_3D_sg_1deriv_sg.differentiate('bias_mV')
+
+# d(LDOS)dV pks & dps
+grid_3D_sg_1deriv_sg_pks = find_peaks_xr(grid_3D_sg_1deriv_sg)
+grid_3D_sg_1deriv_sg_pks_pad = peak_pad(grid_3D_sg_1deriv_sg_pks)
+
+grid_3D_sg_1deriv_sg_dps = find_peaks_xr(-1* grid_3D_sg_1deriv_sg)
+grid_3D_sg_1deriv_sg_dps_pad = peak_pad(grid_3D_sg_1deriv_sg_dps)
+
+# d2(LDOS)dV2 pks & dps
+
+grid_3D_sg_2deriv_sg =  savgolFilter_xr(grid_3D_sg_2deriv)
+grid_3D_sg_2deriv_sg_pks = find_peaks_xr(grid_3D_sg_2deriv_sg)
+grid_3D_sg_2deriv_sg_pks_pad = peak_pad(grid_3D_sg_2deriv_sg_pks)
+
+grid_3D_sg_2deriv_sg_dps = find_peaks_xr(-1* grid_3D_sg_2deriv_sg)
+grid_3D_sg_2deriv_sg_dps_pad = peak_pad(grid_3D_sg_2deriv_sg_dps)
+
+# +
+grid_3D_sg_2deriv_sg_dps_pad.isel(peaks=0).I_fb_peaks_pad.plot()
+# 첫번째 peak 만 골라내서 그리기.
+
+
+
+# +
+# peak 들 가운데 (0-300 사이) 가운데 가장 가까운것들만 모으기 
+
+#pd.DataFrame(np.isin(grid_3D_sg_2deriv_sg_dps_pad.LIX_unit_calc_peaks.values,[149,151])).sum()
+
+
+# list 로 꺼내는법 
+
+grid_3D_sg_2deriv_sg_dps_pad.LIX_unit_calc_peaks.isel(X=0, Y=0).values.tolist().tolist()
+
+
+# -
+
+TEST = grid_3D_sg_2deriv_sg_dps_pad.LIX_unit_calc_peaks_pad.isel(X=0, Y=0).to_numpy()
+TEST
+
+ grid_3D_sg_2deriv_sg_dps_pad.LIX_unit_calc_peaks_pad.to_numpy()
+
+grid_3D_sg_2deriv_sg_dps_pad.LIX_unit_calc_peaks.to_numpy()
+
+np.save("test0.npy",grid_3D_sg_2deriv_sg_dps_pad.LIX_unit_calc_peaks_pad.values)
+
+np.save("test.npy",grid_3D_sg_2deriv_sg_dps_pad.LIX_unit_calc_peaks_pad.isin([150]).values)
+
+grid_3D_sg_2deriv_sg_dps_pad['LIX_unit_calc_peaks_v'] = grid_3D_sg_2deriv_sg_dps_pad.LIX_unit_calc.isel(bias_mV=0)
+# make a null space 
+
+
+# +
+X_len  = len(grid_3D_sg_2deriv_sg_dps_pad.X)
+Y_len  = len(grid_3D_sg_2deriv_sg_dps_pad.Y)
+
+for x_i in range(X_len) for y_j in range(Y_len) 
+# -
+
+grid_3D_sg_2deriv_sg_dps_pad['LIX_unit_calc_peaks_v'].map
+
+[grid_3D_sg_2deriv_sg_dps_pad['LIX_unit_calc_peaks_v'].isel(X= x_i, Y = y_j) for x_i in range(X_len) for y_j in range(Y_len) ]
+
+# +
+grid_3D_sg_2deriv_sg_dps_pad['LIX_unit_calc_peaks_v']
+
+=
+grid_3D_sg_2deriv_sg_dps_pad
+#grid_3D_sg_2deriv_sg_dps_pad.LIX_unit_calc_peaks.isel(X=0, Y=0).values.ravel()
+# -
+
+grid_3D_sg_2deriv_sg_dps_pad.LIX_unit_calc_peaks.values
+
 # ### 2-2-1 bokeh plot & Lasso Selection + get point_lists
+
+
+
+
 
 # +
 hv.extension('bokeh')
