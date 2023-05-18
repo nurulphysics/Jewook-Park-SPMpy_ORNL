@@ -382,7 +382,7 @@ def hv_XY_slicing(xr_data,ch = 'LIX_fb', slicing= 'X', frame_width = 200,cmap = 
 
 # -
 
-def plot_XYslice_w_LDOS (xr_data, data_channel='LIX_fb', slicing_bias_mV = 2):
+def plot_XYslice_w_LDOS (xr_data, data_channel='LIX_fb'):
     
     '''
     ################################
@@ -404,14 +404,13 @@ def plot_XYslice_w_LDOS (xr_data, data_channel='LIX_fb', slicing_bias_mV = 2):
     
     print("use the sliderX&Y first")
     plt.style.use('default')
-    sliderX_v = xr_data.X[sliderX.value].values
-    sliderY_v = xr_data.Y[sliderY.value].values
-
-
     xr_data_Hline_profile = xr_data.isel(Y = sliderY.value)[data_channel]
 
     xr_data_Vline_profile = xr_data.isel(X = sliderX.value)[data_channel]
-    
+    sliderX_v = xr_data.X[sliderX.value].values
+    sliderY_v = xr_data.Y[sliderY.value].values
+    slicing_bias_mV = 5
+
     # bias_mV slicing
     fig,axes = plt.subplots (nrows = 2,
                             ncols = 2,
@@ -439,7 +438,7 @@ def plot_XYslice_w_LDOS (xr_data, data_channel='LIX_fb', slicing_bias_mV = 2):
 # only after bbox setup & streaming bound_box positions
 
 
-def hv_bbox_avg (xr_data,bound_box, slicing_bias_mV = 0.5):
+def hv_bbox_avg (xr_data, slicing_bias_mV = 0.5, bound_box):
     '''
     ** only after hv_bo
     assign  bound_box
@@ -576,32 +575,9 @@ def savgolFilter_xr(xrdata,window_length=7,polyorder=3):
 
 
 # +
-def find_plateau_tolarence_values (xr_data,  x_i ,     y_j , tolerance_I= 1E-10, tolerance_LIX = 1E-12,    ):
-    '''
-    
-    Use slider in advance. 
-    check XY position with 
-    "plot_XYslice_w_LDOS" function 
-    
-        #### use the slider 
-        sliderX = pnw.IntSlider(name='X', 
-                           start = 0 ,
-                           end = grid_3D.X.shape[0]) 
-        sliderY = pnw.IntSlider(name='Y', 
-                           start = 0 ,
-                           end = grid_3D.Y.shape[0]) 
-
-        #sliderX_v_intact = interact(lambda x:  grid_3D.X[x].values, x =sliderX)[1]
-        #sliderY_v_intact = interact(lambda y:  grid_3D.Y[y].values, y =sliderY)[1]
-        pn.Column(interact(lambda x:  grid_3D.X[x].values, x =sliderX), interact(lambda y: grid_3D.Y[y].values, y =sliderY))
-        # Do not exceed the max Limit ==> error
-        # how to connect interactive values to the other cell --> need to update (later) 
-        x_i = sliderX.value
-        y_j = sliderY.value 
-    
-    
-    '''
-
+def find_plateau_tolarence_values (xr_data, tolerance_I= 1E-10, tolerance_LIX = 1E-12):
+    x_i = sliderX.value
+    y_j = sliderY.value 
     print (x_i ,y_j)
 
 
@@ -626,8 +602,7 @@ def find_plateau_tolarence_values (xr_data,  x_i ,     y_j , tolerance_I= 1E-10,
                    facecolor='yellow', interpolate=True, alpha=0.3)
     return 
 
-
-
+    
 # -
 
 def find_plateau(xr_data,tolerance_I=1E-10 , tolerance_LIX = 1E-11,apply_SGfilter = False):
@@ -659,62 +634,6 @@ def find_plateau(xr_data,tolerance_I=1E-10 , tolerance_LIX = 1E-11,apply_SGfilte
             xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data[data_ch] ) <= tolerance_LIX
 
     return xr_data_prcssd
-
-
-# +
-def find_plateau_tolarence_values (xr_data,  x_i ,     y_j , tolerance_I= 1E-10, tolerance_LIX = 1E-12,    ):
-    '''
-    
-    Use slider in advance. 
-    check XY position with 
-    "plot_XYslice_w_LDOS" function 
-    
-        #### use the slider 
-        sliderX = pnw.IntSlider(name='X', 
-                           start = 0 ,
-                           end = grid_3D.X.shape[0]) 
-        sliderY = pnw.IntSlider(name='Y', 
-                           start = 0 ,
-                           end = grid_3D.Y.shape[0]) 
-
-        #sliderX_v_intact = interact(lambda x:  grid_3D.X[x].values, x =sliderX)[1]
-        #sliderY_v_intact = interact(lambda y:  grid_3D.Y[y].values, y =sliderY)[1]
-        pn.Column(interact(lambda x:  grid_3D.X[x].values, x =sliderX), interact(lambda y: grid_3D.Y[y].values, y =sliderY))
-        # Do not exceed the max Limit ==> error
-        # how to connect interactive values to the other cell --> need to update (later) 
-        x_i = sliderX.value
-        y_j = sliderY.value 
-    
-    
-    '''
-
-    print (x_i ,y_j)
-
-
-    fig,axes =  plt.subplots (ncols = 2, figsize = (6,3), sharex = True)
-    axs = axes.ravel()
-
-    # for I_fb
-    xr_data.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[0])
-    axs[0].axhline(y=tolerance_I, c='orange') # pos tolerance line
-    axs[0].axhline(y=-tolerance_I, c='orange') # neg tolerance line
-    # fill between x area where Y value is smaller than tolerance value 
-    axs[0].fill_between(xr_data.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
-                   where=abs(xr_data.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
-                   facecolor='yellow', interpolate=True, alpha=0.3)
-    # for LIX_fb
-    xr_data.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[1])
-    axs[1].axhline(y=tolerance_LIX, c='orange') # pos tolerance line
-    axs[1].axhline(y=-tolerance_LIX, c='orange') # neg tolerance line
-    # fill between x area where Y value is smaller than tolerance value 
-    axs[1].fill_between(xr_data.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
-                   where=abs(xr_data.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
-                   facecolor='yellow', interpolate=True, alpha=0.3)
-    return 
-
-
-
-# -
 
 
 
