@@ -112,92 +112,92 @@ except ModuleNotFoundError:
 #     
 #
 
-# + active=""
-# def grid_3D_Gap(grid_3D, I_0_pA = 1E-13 ,LIX_0_pA = 1E-14):
-#     '''
-#     # simply assign the gap by using I & LIX reference 0 point. 
-#     
-#     '''
-#     grid_3D_prcssd = grid_3D.copy(deep = True)
-#     # I_fb values less than I_min_A => zero value 
-#     I_0_pA = I_0_pA
-#
-#     gap_mask_I  = np.abs(grid_3D.I_fb) < I_0_pA
-#     gap_I =  grid_3D.I_fb.where(gap_mask_I)
-#
-#     CBM_I_mV = grid_3D.bias_mV.where(gap_mask_I).max('bias_mV') # CBM_I_mV
-#     VBM_I_mV = grid_3D.bias_mV.where(gap_mask_I).min('bias_mV') # VBM_I_mV
-#     # map of the CBM&VBM energy (bias_mV)   
-#     gap_size_I =  (CBM_I_mV - VBM_I_mV ) 
-#     # from VBM to CBM energy gap size in mV ( index differnce * bias_mV step size) 
-#
-#     grid_3D_prcssd['CBM_I_mV'] = CBM_I_mV
-#     grid_3D_prcssd['VBM_I_mV'] = VBM_I_mV
-#     grid_3D_prcssd['gap_size_I'] = gap_size_I
-#     ###############################################
-#
-#     grid_3D['dIdV'] = grid_3D.differentiate(coord = 'bias_mV').I_fb
-#     # numerically calculated dI/dV from I_fb
-#     LIX_ratio = grid_3D.dIdV / grid_3D.LIX_fb
-#        
-#     grid_3D['LIX_unit_calc'] = np.abs( LIX_ratio.mean())*grid_3D.LIX_fb
-#     # LIX unit calibration 
-#     # pA unit : lock-in result 
-#     # LIX_unit_calc : calibrated as [A/V] unit for dI/dV
-#     
-#     
-#     # LIX_fb values less than LIX_min_A => zero value 
-#     # LIX_0_pA = LIX_0_pA
-#     LIX_0_AV  =  LIX_0_pA * LIX_ratio.mean()
-#     # calibrated LIX resolution limit
-#     gap_mask_LIX  = np.abs(grid_3D.LIX_unit_calc) < LIX_0_AV
-#     # gap_mask_LIX  = np.abs(grid_3D.LIX_fb) > LIX_0_pA
-#     # because of the same coefficient ('LIX_ratio.mean()')
-#     # range for CBM &VBM is not different between  LIX_unit_calc & LIX_fb
-#     # 3D mask 
-#
-#     LIX_unit_calc_offst = grid_3D.dIdV.where(gap_mask_I).mean()- grid_3D['LIX_unit_calc'].where(gap_mask_I).mean()
-#     # possible LIX offset adjust (based on dI/dV calc value)
-#     grid_3D_prcssd['LDOS_fb'] = grid_3D.LIX_unit_calc + LIX_unit_calc_offst
-#     # assign dI/dV value at I=0  as a reference offset 
-#     # grid_3D['LDOS_fb'] is calibrated dIdV with correct unit ([A/V]) for LDOS 
-#     # LDOS_fb is proportional to the real LDOS
-#     # here we dont consider the matrix element for
-#     grid_3D_prcssd['CBM_LIX_mV'] = grid_3D.bias_mV.where(gap_mask_LIX).max('bias_mV').fillna(0)
-#     
-#     #CBM_I_mV = grid_3D.bias_mV.where(gap_mask_I).max('bias_mV') # CBM_I_mV
-#
-#     
-#     grid_3D_prcssd['VBM_LIX_mV'] = grid_3D.bias_mV.where(gap_mask_LIX).min('bias_mV').fillna(0)
-#     # CBM& VBM bias_mV value ,  fill nan as (0)
-#     gap_size_LIX = grid_3D_prcssd.CBM_LIX_mV - grid_3D_prcssd.VBM_LIX_mV
-#     grid_3D_prcssd['gap_size_LIX'] = gap_size_LIX
-#     # cf) use the 'isin' to find zero & find the index with 'np.argwhere'
-#
-#     # (c.f) to fill the VBM, 
-#     #grid_3D_prcssd['VBM_LIX'] = grid_3D.LIX_fb.where(gap_mask_LIX).fillna(10000).argmin(dim = 'bias_mV')
-#     # apply find gap_mask_LIX(gapped area), fill 'nan' as -10000 & find argmax 
-#     #grid_3D_prcssd['VBM_LIX'] = grid_3D.VBM_LIX.where(~gap_mask_LIX).fillna(np.argwhere(grid_3D_prcssd.bias_mV.isin(0).values)[0,0])
-#     # for the metallic area (~gap_mask_LIX), fill the bias_mV index of 'zero_bias'
-#     #grid_3D_prcssd['VBM_LIX']=  grid_3D_prcssd['VBM_LIX'].astype(np.int64)
-#     # the same dtype as np.int64
-#     grid_3D_prcssd.attrs['I[A]_limit'] = I_0_pA
-#     grid_3D_prcssd.attrs['LDOS[A/V]_limit'] = LIX_0_AV.values
-#     
-#     ## split  LIX_fb_offst as a CB & VB region 
-#     
-#     grid_3D_prcssd['LDOS_fb_CB'] =  grid_3D_prcssd.LDOS_fb.where(
-#         grid_3D_prcssd.bias_mV  >  grid_3D_prcssd.CBM_LIX_mV
-#     )
-#     grid_3D_prcssd['LDOS_fb_VB'] =  grid_3D_prcssd.LDOS_fb.where(
-#         grid_3D_prcssd.bias_mV  <  grid_3D_prcssd.VBM_LIX_mV
-#     )
-#     
-#     return grid_3D_prcssd
-#
-# #test
-# #grid_3D_gap = grid_3D_Gap(grid_3D)
-# #grid_3D_gap
+# +
+def grid_3D_Gap(grid_3D, I_0_pA = 1E-13 ,LIX_0_pA = 1E-14):
+    '''
+    # simply assign the gap by using I & LIX reference 0 point. 
+    
+    '''
+    grid_3D_prcssd = grid_3D.copy(deep = True)
+    # I_fb values less than I_min_A => zero value 
+    I_0_pA = I_0_pA
+
+    gap_mask_I  = np.abs(grid_3D.I_fb) < I_0_pA
+    gap_I =  grid_3D.I_fb.where(gap_mask_I)
+
+    CBM_I_mV = grid_3D.bias_mV.where(gap_mask_I).max('bias_mV') # CBM_I_mV
+    VBM_I_mV = grid_3D.bias_mV.where(gap_mask_I).min('bias_mV') # VBM_I_mV
+    # map of the CBM&VBM energy (bias_mV)   
+    gap_size_I =  (CBM_I_mV - VBM_I_mV ) 
+    # from VBM to CBM energy gap size in mV ( index differnce * bias_mV step size) 
+
+    grid_3D_prcssd['CBM_I_mV'] = CBM_I_mV
+    grid_3D_prcssd['VBM_I_mV'] = VBM_I_mV
+    grid_3D_prcssd['gap_size_I'] = gap_size_I
+    ###############################################
+
+    grid_3D['dIdV'] = grid_3D.differentiate(coord = 'bias_mV').I_fb
+    # numerically calculated dI/dV from I_fb
+    LIX_ratio = grid_3D.dIdV / grid_3D.LIX_fb
+       
+    grid_3D['LIX_unit_calc'] = np.abs( LIX_ratio.mean())*grid_3D.LIX_fb
+    # LIX unit calibration 
+    # pA unit : lock-in result 
+    # LIX_unit_calc : calibrated as [A/V] unit for dI/dV
+    
+    
+    # LIX_fb values less than LIX_min_A => zero value 
+    # LIX_0_pA = LIX_0_pA
+    LIX_0_AV  =  LIX_0_pA * LIX_ratio.mean()
+    # calibrated LIX resolution limit
+    gap_mask_LIX  = np.abs(grid_3D.LIX_unit_calc) < LIX_0_AV
+    # gap_mask_LIX  = np.abs(grid_3D.LIX_fb) > LIX_0_pA
+    # because of the same coefficient ('LIX_ratio.mean()')
+    # range for CBM &VBM is not different between  LIX_unit_calc & LIX_fb
+    # 3D mask 
+
+    LIX_unit_calc_offst = grid_3D.dIdV.where(gap_mask_I).mean()- grid_3D['LIX_unit_calc'].where(gap_mask_I).mean()
+    # possible LIX offset adjust (based on dI/dV calc value)
+    grid_3D_prcssd['LDOS_fb'] = grid_3D.LIX_unit_calc + LIX_unit_calc_offst
+    # assign dI/dV value at I=0  as a reference offset 
+    # grid_3D['LDOS_fb'] is calibrated dIdV with correct unit ([A/V]) for LDOS 
+    # LDOS_fb is proportional to the real LDOS
+    # here we dont consider the matrix element for
+    grid_3D_prcssd['CBM_LIX_mV'] = grid_3D.bias_mV.where(gap_mask_LIX).max('bias_mV').fillna(0)
+    
+    #CBM_I_mV = grid_3D.bias_mV.where(gap_mask_I).max('bias_mV') # CBM_I_mV
+
+    
+    grid_3D_prcssd['VBM_LIX_mV'] = grid_3D.bias_mV.where(gap_mask_LIX).min('bias_mV').fillna(0)
+    # CBM& VBM bias_mV value ,  fill nan as (0)
+    gap_size_LIX = grid_3D_prcssd.CBM_LIX_mV - grid_3D_prcssd.VBM_LIX_mV
+    grid_3D_prcssd['gap_size_LIX'] = gap_size_LIX
+    # cf) use the 'isin' to find zero & find the index with 'np.argwhere'
+
+    # (c.f) to fill the VBM, 
+    #grid_3D_prcssd['VBM_LIX'] = grid_3D.LIX_fb.where(gap_mask_LIX).fillna(10000).argmin(dim = 'bias_mV')
+    # apply find gap_mask_LIX(gapped area), fill 'nan' as -10000 & find argmax 
+    #grid_3D_prcssd['VBM_LIX'] = grid_3D.VBM_LIX.where(~gap_mask_LIX).fillna(np.argwhere(grid_3D_prcssd.bias_mV.isin(0).values)[0,0])
+    # for the metallic area (~gap_mask_LIX), fill the bias_mV index of 'zero_bias'
+    #grid_3D_prcssd['VBM_LIX']=  grid_3D_prcssd['VBM_LIX'].astype(np.int64)
+    # the same dtype as np.int64
+    grid_3D_prcssd.attrs['I[A]_limit'] = I_0_pA
+    grid_3D_prcssd.attrs['LDOS[A/V]_limit'] = LIX_0_AV.values
+    
+    ## split  LIX_fb_offst as a CB & VB region 
+    
+    grid_3D_prcssd['LDOS_fb_CB'] =  grid_3D_prcssd.LDOS_fb.where(
+        grid_3D_prcssd.bias_mV  >  grid_3D_prcssd.CBM_LIX_mV
+    )
+    grid_3D_prcssd['LDOS_fb_VB'] =  grid_3D_prcssd.LDOS_fb.where(
+        grid_3D_prcssd.bias_mV  <  grid_3D_prcssd.VBM_LIX_mV
+    )
+    
+    return grid_3D_prcssd
+
+#test
+#grid_3D_gap = grid_3D_Gap(grid_3D)
+#grid_3D_gap
 # +
 def grid_3D_SC(grid_3D, I_0_pA = 1E-13 ,LIX_0_pA = 1E-14):
     '''
@@ -294,7 +294,6 @@ def grid_3D_SC(grid_3D, I_0_pA = 1E-13 ,LIX_0_pA = 1E-14):
 # # holoview functions
 #
 
-# +
 def hv_bias_mV_slicing(xr_data,ch = 'LIX_fb',frame_width = 200,cmap = 'bwr'): 
     '''
     input : xarray dataset 
@@ -303,7 +302,7 @@ def hv_bias_mV_slicing(xr_data,ch = 'LIX_fb',frame_width = 200,cmap = 'bwr'):
     * slicing 3D data set in XY plane 
     * bias_mV is knob
     
-    default channel  =  'LIX_fb',  or assgin 'I_fb'
+    default channel  =  'LIX_fb',  or assgin 'I_fb' or 'LDOS_fb'
     default setting for frame width and cmap  can be changed. 
     
     if you need to add color limit 
@@ -332,7 +331,9 @@ def hv_bias_mV_slicing(xr_data,ch = 'LIX_fb',frame_width = 200,cmap = 'bwr'):
 
 
 
-# +
+
+
+
 def hv_XY_slicing(xr_data,ch = 'LIX_fb', slicing= 'X', frame_width = 200,cmap = 'bwr'): 
     '''
     input : xarray dataset 
@@ -379,8 +380,6 @@ def hv_XY_slicing(xr_data,ch = 'LIX_fb', slicing= 'X', frame_width = 200,cmap = 
     fig = hv.render(dmap)
     return dmap   
 
-
-# -
 
 def plot_XYslice_w_LDOS (xr_data, data_channel='LIX_fb', slicing_bias_mV = 2):
     
@@ -439,26 +438,60 @@ def plot_XYslice_w_LDOS (xr_data, data_channel='LIX_fb', slicing_bias_mV = 2):
 # only after bbox setup & streaming bound_box positions
 
 
-def hv_bbox_avg (xr_data,bound_box, slicing_bias_mV = 0.5):
+def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
     '''
-    ** only after hv_bo
-    assign  bound_box
-    bound_box = bound_box
+    ** only after Bound box settup with hV 
+    
+        import holoviews as hv
+        from holoviews import opts
+        hv.extension('bokeh')
+
+        grid_channel_hv = hv.Dataset(grid_3D.I_fb)
+
+        # bias_mV slicing
+        dmap_plane  = ["X","Y"]
+        dmap = grid_channel_hv.to(hv.Image,
+                                  kdims = dmap_plane,
+                                  dynamic = True )
+        dmap.opts(colorbar = True,
+                  cmap = 'bwr',
+                  frame_width = 200,
+                  aspect = 'equal')#.relabel('XY plane slicing: ')
+
+        grid_channel_hv_image  = hv.Dataset(grid_3D.I_fb.isel(bias_mV = 0)).relabel('for BBox selection : ')
+
+        bbox_points = hv.Points(grid_channel_hv_image).opts(frame_width = 200,
+                                                            color = 'k',
+                                                            aspect = 'equal',
+                                                            alpha = 0.1,                                   
+                                                            tools=['box_select'])
+
+        bound_box = hv.streams.BoundsXY(source = bbox_points,
+                                        bounds=(0,0,0,0))
+        dmap*bbox_points
+
+    
     '''
+    import holoviews as hv
+    from holoviews import opts
     hv.extension('bokeh')
     # slicing bias_mV = 5 mV
     
     #bound_box.bounds
-    x_bounds_msk = (grid_3D.X > bound_box.bounds[0] ) & (grid_3D.X < bound_box.bounds[2])
-    y_bounds_msk = (grid_3D.Y > bound_box.bounds[1] ) & (grid_3D.Y < bound_box.bounds[3])
+    x_bounds_msk = (xr_data.X > bound_box.bounds[0] ) & (xr_data.X < bound_box.bounds[2])
+    y_bounds_msk = (xr_data.Y > bound_box.bounds[1] ) & (xr_data.Y < bound_box.bounds[3])
 
-    grid_3D_bbox = grid_3D.where (grid_3D.X[x_bounds_msk] + grid_3D.Y[y_bounds_msk])
-
+    xr_data_bbox = xr_data.where (xr_data.X[x_bounds_msk] + xr_data.Y[y_bounds_msk])
+    
+    isns.reset_defaults()
+    isns.set_image(origin = 'lower')
+    # isns image directino setting 
+    
     fig,axs = plt.subplots (nrows = 1,
                             ncols = 3,
                             figsize = (12,4))
 
-    isns.imshow(grid_3D.I_fb.sel(bias_mV = slicing_bias_mV, method="nearest" ),
+    isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
                 ax =  axs[0],
                 robust = True)
 
@@ -466,10 +499,11 @@ def hv_bbox_avg (xr_data,bound_box, slicing_bias_mV = 0.5):
     from matplotlib.patches import Rectangle
     # find index value of bound box 
 
-    Bbox_x0 = np.abs((grid_3D.X-bound_box.bounds[0]).to_numpy()).argmin()
-    Bbox_y0 = np.abs((grid_3D.Y-bound_box.bounds[1]).to_numpy()).argmin()
-    Bbox_x1 = np.abs((grid_3D.X-bound_box.bounds[2]).to_numpy()).argmin()
-    Bbox_y1 = np.abs((grid_3D.Y-bound_box.bounds[3]).to_numpy()).argmin()
+    Bbox_x0 = np.abs((xr_data.X-bound_box.bounds[0]).to_numpy()).argmin()
+    Bbox_y0 = np.abs((xr_data.Y-bound_box.bounds[1]).to_numpy()).argmin()
+    Bbox_x1 = np.abs((xr_data.X-bound_box.bounds[2]).to_numpy()).argmin()
+    Bbox_y1 = np.abs((xr_data.Y-bound_box.bounds[3]).to_numpy()).argmin()
+    Bbox = Bbox_x0,Bbox_y0,Bbox_x1,Bbox_y1
     # substract value, absolute value with numpy, argmin returns index value
 
     # when add rectangle, add_patch used index 
@@ -480,20 +514,22 @@ def hv_bbox_avg (xr_data,bound_box, slicing_bias_mV = 0.5):
                                lw=2,
                                alpha=0.5))
 
-    isns.imshow(grid_3D_bbox.I_fb.sel(bias_mV = slicing_bias_mV, method="nearest" ),
+    isns.imshow(xr_data_bbox[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
                 ax =  axs[1],
                 robust = True)
     sns.lineplot(x = "bias_mV",
-                 y = "LIX_fb", 
-                 data = grid_3D_bbox.to_dataframe(),
+                 y = ch, 
+                 data = xr_data_bbox.to_dataframe(),
                  ax = axs[2])
     #plt.savefig('grid011_bbox)p.png')
     plt.show()
-    return 
+    # 3 figures will be diplayed, original image with Bbox area, BBox area zoom, BBox averaged STS
+    return xr_data_bbox, fig
     # plot STS at the selected points 
     # use the seaborn (confident interval : 95%) 
     # sns is figure-level function 
 # -
+
 
 
 
@@ -573,6 +609,61 @@ def savgolFilter_xr(xrdata,window_length=7,polyorder=3):
 
 #grid_2D_sg = savgolFilter_xr(grid_2D)
 #grid_2D_sg
+
+
+# -
+
+def plot_XYslice_w_LDOS (xr_data, sliderX, sliderY, ch ='LIX_fb', slicing_bias_mV = 2):
+    
+    '''
+    ################################
+    # use the slider in advance 
+    sliderX = pnw.IntSlider(name='X', 
+                           start = 0 ,
+                           end = grid_3D.X.shape[0]) 
+    sliderY = pnw.IntSlider(name='Y', 
+                           start = 0 ,
+                           end = grid_3D.Y.shape[0]) 
+
+    #sliderX_v_intact = interact(lambda x:  grid_3D.X[x].values, x =sliderX)[1]
+    #sliderY_v_intact = interact(lambda y:  grid_3D.Y[y].values, y =sliderY)[1]
+    pn.Column(interact(lambda x:  grid_3D.X[x].values, x =sliderX), interact(lambda y: grid_3D.Y[y].values, y =sliderY))
+
+    ####################################
+    
+    '''
+    
+    print("use the sliderX&Y first")
+    #plt.style.use('default')
+    sliderX_v = xr_data.X[sliderX.value].values
+    sliderY_v = xr_data.Y[sliderY.value].values
+
+
+    xr_data_Hline_profile = xr_data.isel(Y = sliderY.value)[ch]
+
+    xr_data_Vline_profile = xr_data.isel(X = sliderX.value)[ch]
+    
+    # bias_mV slicing
+    fig,axes = plt.subplots (nrows = 2,
+                            ncols = 2,
+                            figsize = (6,6))
+    axs = axes.ravel()
+
+    isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
+                    ax =  axs[0],
+                    robust = True)
+    axs[0].hlines(sliderY.value,0,xr_data.X.shape[0], lw = 1, color = 'c')
+    axs[0].vlines(sliderX.value,0,xr_data.Y.shape[0], lw = 1, color = 'm')    
+
+    xr_data_Vline_profile.plot(ax = axs[1],robust = True)#, vmin = xr_data_Vline_profile.to_numpy().min() , vmax = xr_data_Vline_profile.to_numpy().max())
+    xr_data_Hline_profile.T.plot(ax = axs[2],robust = True)#, vmin = xr_data_Hline_profile.to_numpy().min() , vmax = xr_data_Hline_profile.to_numpy().max())
+
+    xr_data[ch].isel(X =sliderX.value, Y =sliderY.value) .plot(ax =axs[3])
+    #pn.Row(pn.Column(dmap_slideXY,xr_data_Vline_profile.plot()), )
+
+    fig.tight_layout()
+    
+    return plt.show()
 
 
 # +
@@ -715,10 +806,7 @@ def find_plateau_tolarence_values (xr_data,  x_i ,     y_j , tolerance_I= 1E-10,
 
 
 # -
-
-
-
-def find_peaks_xr(xrdata): 
+def find_peaks_xr(xrdata, distance = 1): 
     from scipy.signal import find_peaks
     xrdata_prcssd = xrdata.copy(deep = True)
     print('Find peaks in STS to an xarray Dataset.')
@@ -741,7 +829,7 @@ def find_peaks_xr(xrdata):
                 #print(xrdata_prcssd[data_ch])
 
                 xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                    np.array([ find_peaks(xrdata[data_ch].isel(X = x).values)
+                    np.array([ find_peaks(xrdata[data_ch].isel(X = x).values, distance = distance)
                               for x in range(x_axis)], dtype = object )[:,0],
                 dims=["X"],
                 coords={"X": xrdata.X})
@@ -754,7 +842,7 @@ def find_peaks_xr(xrdata):
                 #print(xrdata_prcssd[data_ch])
 
                 xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                    np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values)
+                    np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values, distance = distance)
                               for y in range(y_axis)], dtype = object )[:,0],
                 dims=["Y"],
                 coords={"Y": xrdata.Y})
@@ -770,7 +858,7 @@ def find_peaks_xr(xrdata):
                                                              dims=["X", "Y"],
                                                              coords={"X": xrdata.X, "Y": xrdata.Y} )"""
             xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values)[0] 
+                np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values, distance = distance)[0] 
                           for x in range(x_axis)  
                           for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis),
                 dims=["X", "Y"],
@@ -778,7 +866,7 @@ def find_peaks_xr(xrdata):
         elif len(xrdata[data_ch].dims) == 1:
             if 'bias_mV' in xrdata.dims: 
                 for data_ch in xrdata: 
-                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch]))
+                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch], distance = distance))
         else : pass
     return xrdata_prcssd
 #grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
@@ -970,6 +1058,35 @@ def peak_pad(xrdata):
 #grid_3D_sg_pks_pad = peak_pad(grid_3D_sg_pks)
 #grid_3D_sg_pks_pad
 # -
+def peak_mV_3Dxr(xr_data,ch='LIX_fb'): 
+    '''
+    after peak finding, 
+    _peaks channels --> 
+    
+    '''
+    
+    #after find_peaks_xr 
+    xrdata_prcssd = xr_data.copy(deep = True)
+    print('After peak finding in STS, marking in the 3D data')
+    x_axis = xr_data.X.size
+    y_axis = xr_data.Y.size
+    bias_mV_axis = xr_data.bias_mV.size
+    
+    peaks_list = xr_data[ch+'_peaks'].values
+    for data_ch in xr_data:
+        if '_peaks' in data_ch:
+            pass
+        # do nothing for channels with_peaks information  
+        else: 
+            xrdata_prcssd[data_ch+'_peaks_mV'] = xr.DataArray (
+                np.array([ xr_data.bias_mV.isin(xr_data.bias_mV[peaks_list[x,y]])
+                          for x in range(x_axis)  
+                          for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis,bias_mV_axis),
+                dims=["X", "Y","bias_mV"],
+                coords={"X": xr_data.X, "Y": xr_data.Y,  "bias_mV": xr_data.bias_mV}) 
+    return xrdata_prcssd
+
+
 '''
 def peak_pad(xrdata):
     xrdata_prcssd = xrdata.copy(deep = True)
@@ -1079,7 +1196,10 @@ def rotate_3D_xr (xrdata, rotation_angle):
 # * average_in = 'X' or 'Y'
 # * ch_l_name = channel name for line profile  
 
-def grid3D_line_avg_pks (xr_data, average_in =  'X', ch_l_name = 'LIX_unit_calc') : 
+def grid3D_line_avg_pks (xr_data, average_in =  'X',
+                         ch_l_name = 'LIX_unit_calc',
+                         distance = None,
+                         threshold = None) : 
 
     if average_in ==  'X':
         mean_direction = 'X'
@@ -1106,7 +1226,7 @@ def grid3D_line_avg_pks (xr_data, average_in =  'X', ch_l_name = 'LIX_unit_calc'
                 savgolFilter_xr(
                     xr_data_l.differentiate(coord='bias_mV')
                 ).differentiate(coord='bias_mV')
-            )*-1))
+            )*-1, distance = distance))
     if average_in ==  'X':
         xr_data_l_pks.attrs['line_direction'] ='Y'
     elif average_in ==  'Y': 
@@ -1133,128 +1253,6 @@ def grid3D_line_avg_pks (xr_data, average_in =  'X', ch_l_name = 'LIX_unit_calc'
 # ### only after after **grid3D_line_avg_pks**
 #
 
-def  grid_lineNpks_offset(xr_data_l_pks, 
-                          ch_l_name = 'LIX_unit_calc',
-                          plot_y_offset= 2E-11, 
-                          peak_LIX_min = 1E-13, fig_size = (6,8)):
-    # add peak point one-by-one (no palett func in sns)
-    #  after find peak & padding
-    # use choose the channel to offset-plot 
-    # use the plot_y_offset to adjust the offset values 
-    ch_l_name = ch_l_name
-    ch_l_pk_name = ch_l_name +'_peaks_pad'
-    line_direction = xr_data_l_pks.line_direction
-    plot_y_offset  =  plot_y_offset
-    
-    sns_color_palette = "rocket"
-    #color map for fig
-    
-    #xr_data_l_pks
-    ### prepare XR dataframe for line spectroscopy plot 
-    xr_data_l_pks_ch_slct = xr_data_l_pks[[ch_l_name,ch_l_pk_name]]
-    # choose the 2 channels from 2nd derivative (to maintain the coords info) 
-
-
-    #line_direction check again 
-    
-    if xr_data_l_pks.line_direction == 'Y': 
-        spacing = xr_data_l_pks_ch_slct.Y_spacing
-    elif xr_data_l_pks.line_direction == 'X': 
-        spacing = xr_data_l_pks_ch_slct.X_spacing
-    else : 
-        print('check direction & X or Y spacing for offset') 
-
-    xr_data_l_pks_ch_slct['offset'] = (xr_data_l_pks_ch_slct[line_direction] - xr_data_l_pks_ch_slct[line_direction].min())/spacing
-    # prepare offset index channnel 
-    print (' plot_y_offset  to adjust line-by-line spacing')
-
-    xr_data_l_pks_ch_slct[ch_l_name+'_offset'] = xr_data_l_pks_ch_slct[ch_l_name] + plot_y_offset * xr_data_l_pks_ch_slct['offset']
-    # offset the curve b
-    print (xr_data_l_pks_ch_slct)
-    
-
-    ch_l_name_df_list = [] 
-    ch_l_name_pks_df_list = []
-    # prepare empty list to append dataframes in the for - loop (y_i or x_i)
-
-    #line_direction check again 
-    #########################
-    # line_diection check
-    if xr_data_l_pks_ch_slct.line_direction == 'Y': 
-        lines  = xr_data_l_pks_ch_slct.Y
-
-        for y_i, y_points in enumerate (lines):
-
-            # set min peak height (LIX amplitude =  resolution limit)
-
-            y_i_pks  = xr_data_l_pks_ch_slct[ch_l_pk_name].isel(Y = y_i).dropna(dim='peaks').astype('int32')
-            # at (i_th )Y position, select peak index for bias_mV
-            real_pks_mask = (xr_data_l_pks_ch_slct.isel(Y = y_i, bias_mV = y_i_pks.values)[ch_l_name] > peak_LIX_min).values
-            # prepare a 'temp' mask for each Y position 
-            y_i_pks_slct =  y_i_pks.where(real_pks_mask).dropna(dim='peaks').astype('int32')
-            # y_i_pks_slct with mask selection  
-
-            ch_l_name_y_i_df = xr_data_l_pks_ch_slct[ch_l_name+'_offset'].isel(Y = y_i).to_dataframe()
-            # LIX_offset  at Y_i position 
-            ch_l_name_df_list.append(ch_l_name_y_i_df)
-            
-            ch_l_name_y_i_pks_df = xr_data_l_pks_ch_slct.isel(Y = y_i, bias_mV = y_i_pks_slct.values)[ch_l_name+'_offset'].to_dataframe()
-            # selected peaks with offest Y 
-            ch_l_name_pks_df_list.append(ch_l_name_y_i_pks_df)
-            
-            # data at selected Y, & peak position, LIX_offset
-            
-    #########################
-    # line_diection check
-
-    elif xr_data_l_pks_ch_slct.line_direction == 'X': 
-        lines = xr_data_l_pks_ch_slct.X
-
-        for x_i, x_points in enumerate (lines):
-
-            # set min peak height (LIX amplitude =  resolution limit)
-
-            x_i_pks  = xr_data_l_pks_ch_slct[ch_l_pk_name].isel(X = x_i).dropna(dim='peaks').astype('int32')
-            # at (i_th )X position, select peak index for bias_mV
-            real_pks_mask = (xr_data_l_pks_ch_slct.isel(X = x_i, bias_mV = x_i_pks.values)[ch_l_name] > peak_LIX_min).values
-            # prepare a 'temp' mask for each X position 
-            x_i_pks_slct =  x_i_pks.where(real_pks_mask).dropna(dim='peaks').astype('int32')
-            # x_i_pks_slct with mask selection  
-
-            ch_l_name_x_i_df = xr_data_l_pks_ch_slct[ch_l_name+'_offset'].isel(X = x_i).to_dataframe()
-            # LIX_offset  at X_i position 
-            ch_l_name_df_list.append(ch_l_name_x_i_df)
-            ch_l_name_x_i_pks_df = xr_data_l_pks_ch_slct.isel(X = x_i, bias_mV = x_i_pks_slct.values)[ch_l_name+'_offset'].to_dataframe()
-            ch_l_name_pks_df_list.append(ch_l_name_x_i_pks_df)
-            
-            # selected peaks with offest X 
-            
-    else : 
-        print('check direction & X or Y spacing for offset') 
-    
-    ch_l_name_df = pd.concat(ch_l_name_df_list).reset_index()
-    ch_l_name_pks_df = pd.concat(ch_l_name_pks_df_list).reset_index()
-    
-    fig,ax = plt.subplots(figsize = fig_size)
-
-    sns.lineplot(data = ch_l_name_df,
-                         x ='bias_mV', 
-                         y = ch_l_name+'_offset',
-                         palette = "rocket",
-                         hue = xr_data_l_pks.line_direction,
-                         ax = ax)
-
-    sns.scatterplot(data = ch_l_name_pks_df,
-                            x ='bias_mV',
-                            y = ch_l_name+'_offset',
-                            palette ="rocket",
-                            hue = xr_data_l_pks.line_direction,
-                            ax = ax)
-    # legend control!( cut the handles 1/2)
-    ax.set_xlabel('Bias (mV)')   
-    ax.set_ylabel(ch_l_name+'_offset')   
-    plt.show()
-    return xr_data_l_pks_ch_slct, ch_l_name_df, ch_l_name_pks_df, fig
 
 
 def  grid_lineNpks_offset(xr_data_l_pks, 
@@ -1368,29 +1366,29 @@ def  grid_lineNpks_offset(xr_data_l_pks,
                          y = ch_l_name+'_offset',
                          palette = "rocket",
                          hue = xr_data_l_pks.line_direction,
-                         ax = ax)
+                         ax = ax,legend='full')
 
     sns.scatterplot(data = ch_l_name_pks_df,
                             x ='bias_mV',
                             y = ch_l_name+'_offset',
                             palette ="rocket",
                             hue = xr_data_l_pks.line_direction,
-                    s =0,
-                            ax = ax)
+                            ax = ax,legend='full')
     # legend control!( cut the handles 1/2)
     ax.set_xlabel('Bias (mV)')   
     #ax.set_ylabel(ch_l_name+'_offset')   
     ax.set_ylabel('LDOS')   
     handles0, labels0 = ax.get_legend_handles_labels()
-    labels1 = [ str(float(label)*10) for label in labels0[:int(len(labels0)//2)] ] 
-    # convert the line length as nm  
-    ax.legend(handles0[:int(len(handles0)//2)],
-              labels1, title = legend_title)
+    handles1 = handles0[:int(len(handles0)//2)]
+    labels1 = [ str(round(float(label)*1E9,2)) for label in labels0[:int(len(labels0)//2)] ] 
+    handles2 = handles1[::5][::-1]
+    labels2 = labels1[::5][::-1]
+    # convert the line length as nm
+    print(labels2)
+    ax.legend(handles2,   labels2, title = legend_title)
     # use the half of legends (line + scatter) --> use lines only
     #plt.show()
     return xr_data_l_pks_ch_slct, ch_l_name_df, ch_l_name_pks_df, fig
-
-
 
 
 

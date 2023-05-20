@@ -229,7 +229,13 @@ files_df = files_in_folder(folder_path)
 files_df[files_df.type=='3ds']#.file_name.iloc[0]
 grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[2])
 
+# ### 1.2.1. Convert  to xarray
+
 grid_xr
+
+# ## 1-2.2. Separate topography / gird_3D (I_fb, LIX_fb)
+# * fwd bwd data average 
+#
 
 # +
 grid_xr = grid_xr.assign_coords({'X': grid_xr.X -  grid_xr.X.min()})
@@ -246,15 +252,30 @@ grid_3D = grid_xr[['I_fb','LIX_fb']]
 # averaged I & LIX 
 # -
 
+# ### 1.2.3. Unit calculation (LDOS_fb)
+#     * for semiconductor: CBM,VBM check. gap_map check
+#     * add gap_maps to grid_2D
+
+# +
 grid_3D_gap =  grid_3D_Gap(grid_3D)
+grid_3D_gap
+
+grid_topo['gap_map_I'] = grid_3D_gap.gap_size_I
+grid_topo['gap_map_LIX'] = grid_3D_gap.gap_size_LIX # add gap map to topo data
+grid_2D = grid_topo # rename 2D xr data
+
 grid_LDOS = grid_3D_gap[['LDOS_fb' ]]
 grid_LDOS
+# -
 
 # ### 1.4 Topography view 
 
+# +
 # show topography image
-isns.imshow(plane_fit_y_xr(grid_topo).topography, robust =  True, cmap= 'copper', perc = (2,98))
 
+isns.set_image(origin =  "lower")
+isns.imshow(plane_fit_y_xr(grid_topo).topography, robust =  True, cmap= 'copper', perc = (2,98))
+# -
 
 # ### 1.5 grid_3D data view 
 #
@@ -267,93 +288,9 @@ isns.imshow(plane_fit_y_xr(grid_topo).topography, robust =  True, cmap= 'copper'
 #     * hv_bias_mV_slicing
 #     * hv_XY_slicing
 
-def hv_bias_mV_slicing(xr_data,ch = 'LIX_fb',frame_width = 200,cmap = 'bwr'): 
-    '''
-    input : xarray dataset 
-    output : holoview image
-    
-    * slicing 3D data set in XY plane 
-    * bias_mV is knob
-    
-    default channel  =  'LIX_fb',  or assgin 'I_fb'
-    default setting for frame width and cmap  can be changed. 
-    
-    if you need to add color limit 
-        add ".opts(clim=(0, 1E-10))"
-        
-    '''
-    
-    import holoviews as hv
-    from holoviews import opts
-
-    xr_data_hv = hv.Dataset(xr_data[ch])
-
-    hv.extension('bokeh')
-    ###############
-    # bias_mV slicing
-    dmap_plane  = ["X","Y"]
-    dmap = xr_data_hv.to(hv.Image,
-                         kdims = dmap_plane,
-                         dynamic = True )
-    dmap.opts(colorbar = True,
-              cmap = 'bwr',
-              frame_width = frame_width,
-              aspect = 'equal').relabel('XY plane slicing: ')
-    fig = hv.render(dmap)
-    return dmap   
-
-
 hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb').opts(clim = (0,1E-10))
 
-
 # ####  1.5.2. Y or X slicing 
-
-def hv_XY_slicing(xr_data,ch = 'LIX_fb', slicing= 'X', frame_width = 200,cmap = 'bwr'): 
-    '''
-    input : xarray dataset 
-    output : holoview image 
-    
-    
-    * slicing 3D data set in X-bias_mV or Y-bias_mV plane 
-    * X or Y position is knob
-    
-    
-    default channel  =  'LIX_fb',  or assgin 'I_fb'
-    default setting for frame width and cmap  can be changed. 
-    if you need to add color limit 
-     
-    add ".opts(clim=(0, 1E-10))"
-    
-    '''
-    import holoviews as hv
-    from holoviews import opts
-
-    xr_data_hv = hv.Dataset(xr_data[ch])
-
-    hv.extension('bokeh')
-    ###############
-    # bias_mV slicing
-    if slicing == 'Y':
-        dmap_plane  = [ "X","bias_mV"]
-
-        dmap = xr_data_hv.to(hv.Image,
-                             kdims = dmap_plane,
-                             dynamic = True )
-        dmap.opts(colorbar = True,
-                  cmap = 'bwr',
-                  frame_width = frame_width).relabel('X - bias_mV plane slicing: ')
-    else : #slicing= 'X'
-        dmap_plane  = [ "Y","bias_mV"]
-
-        dmap = xr_data_hv.to(hv.Image,
-                             kdims = dmap_plane,
-                             dynamic = True )
-        dmap.opts(colorbar = True,
-                  cmap = 'bwr',
-                  frame_width = frame_width).relabel('Y - bias_mV plane slicing: ')
-    fig = hv.render(dmap)
-    return dmap   
-
 
 hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X')#.opts(clim=(0, 1E-10))
 #hv_XY_slicing(grid_3D,slicing= 'Y').opts(clim=(0, 1E-11))
@@ -372,21 +309,25 @@ import holoviews as hv
 from holoviews import opts
 hv.extension('bokeh')
 
-grid_channel_hv = hv.Dataset(grid_LDOS.LDOS_fb)
+xr_data = grid_LDOS
+ch = 'LDOS_fb'
+frame_width = 300
+
+xr_data_channel_hv = hv.Dataset(xr_data.LDOS_fb)
 
 # bias_mV slicing
 dmap_plane  = ["X","Y"]
-dmap = grid_channel_hv.to(hv.Image,
+dmap = xr_data_channel_hv.to(hv.Image,
                           kdims = dmap_plane,
                           dynamic = True )
 dmap.opts(colorbar = True,
           cmap = 'bwr',
-          frame_width = 200,
+          frame_width = frame_width,
           aspect = 'equal')#.relabel('XY plane slicing: ')
 
-grid_channel_hv_image  = hv.Dataset(grid_LDOS.LDOS_fb.isel(bias_mV = 0)).relabel('for BBox selection : ')
+xr_data_channel_hv_image  = hv.Dataset(xr_data[ch].isel(bias_mV = 0)).relabel('for BBox selection : ')
 
-bbox_points = hv.Points(grid_channel_hv_image).opts(frame_width = 200,
+bbox_points = hv.Points(xr_data_channel_hv_image).opts(frame_width = frame_width,
                                                     color = 'k',
                                                     aspect = 'equal',
                                                     alpha = 0.1,                                   
@@ -406,12 +347,109 @@ dmap*bbox_points
 
 bound_box
 
+hv_bbox_avg(grid_LDOS, bound_box= bound_box, ch ='LDOS_fb')
+
+# #  <font color= orange > 2. gap & peak analysis (for Superconductor) </font>
+#
+#     * 2.1. Rotation ?
+#         * move it other section? 
+#
+#     * 2.2. Smoothing 
+#         * 2.2.1. Savatzky Golay smoothing 
+#            * window polyoder setting 
+#
+#     * 2.3. Numerical derivative 
+#         * use xr API 
+#
+#     * 2.4 finding plateau
+#         * 2.3.1. prepare plateau detection function for Grid_xr, point 
+#         * 2.3.2. prepare plateau detection function for Grid_xr
+#
+#     * 2.5 finding peaks 
+#
+#         * 2.5.1. peaks from LDOS & d2(LDOS)/dV2
+#             * draw line spectroscopy with peak positions
+#             * compare point spectroscopy w.r.t. parameters. 
+#         * 2.5.2. peaks position 3D drawing
+#             * Zoomin Bbox + bias range 
+#             * using Tomviz + npy 
+#         * 2.5.3 peak properties 
+#             * peak properties mapping 
+#             * replace values ( for loop.. not many points..)
+#
+#
+#
+#
+
+# ## 2.1.rotate 3D_xr
+#
+# * if target area  requires rotation, use rotate_3D_xr function 
+# * thereis separate rotate_2D function 
+# * based on XR API 
+#
+#
+
+# +
+## rotate 3D_xr # rotation in degree not radian 
+
+grid_LDOS_rot = rotate_3D_xr(grid_LDOS,rotation_angle=-45)
+# -
+
+grid_LDOS_rot
+
+# +
+#hv_bias_mV_slicing(grid_LDOS_rot, ch ='LDOS_fb').opts(clim= (0,1E-10))
+
+# +
+import holoviews as hv
+from holoviews import opts
+hv.extension('bokeh')
+
+xr_data = grid_LDOS_rot
+ch = 'LDOS_fb'
+frame_width = 300
+
+xr_data_channel_hv = hv.Dataset(xr_data.LDOS_fb)
+
+# bias_mV slicing
+dmap_plane  = ["X","Y"]
+dmap = xr_data_channel_hv.to(hv.Image,
+                          kdims = dmap_plane,
+                          dynamic = True )
+dmap.opts(colorbar = True,
+          cmap = 'bwr',
+          frame_width = frame_width,
+          aspect = 'equal')#.relabel('XY plane slicing: ')
+
+xr_data_channel_hv_image  = hv.Dataset(xr_data[ch].isel(bias_mV = 0)).relabel('for BBox selection : ')
+
+bbox_points = hv.Points(xr_data_channel_hv_image).opts(frame_width = frame_width,
+                                                    color = 'k',
+                                                    aspect = 'equal',
+                                                    alpha = 0.1,                                   
+                                                    tools=['box_select'])
+
+bound_box = hv.streams.BoundsXY(source = bbox_points,
+                                bounds=(0,0,0,0))
+dmap*bbox_points
+
+
+## hv.DynamicMap( 뒤에는 function 이 와야함), streams  로 해당 영역을 지정.( or 함수의 입력정보 지정) 
+# averaged curve 를 그리기 위해서 해당영역을  xr  에서 average  해야함.. 
+# curve 의 area 로 error bar도 같이 그릴것.. 
+
+
+# -
+
+bound_box
+
+
 # +
 # function for drawing bbox averaged STS 
 # only after bbox setup & streaming bound_box positions
 
 
-def hv_bbox_avg (xr_data, ch = 'LIX_fb' ,slicing_bias_mV = 0.5, bound_box = bound_box):
+def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0):
     '''
     ** only after Bound box settup with hV 
     
@@ -445,6 +483,8 @@ def hv_bbox_avg (xr_data, ch = 'LIX_fb' ,slicing_bias_mV = 0.5, bound_box = boun
 
     
     '''
+    import holoviews as hv
+    from holoviews import opts
     hv.extension('bokeh')
     # slicing bias_mV = 5 mV
     
@@ -454,17 +494,14 @@ def hv_bbox_avg (xr_data, ch = 'LIX_fb' ,slicing_bias_mV = 0.5, bound_box = boun
 
     xr_data_bbox = xr_data.where (xr_data.X[x_bounds_msk] + xr_data.Y[y_bounds_msk])
     
-    isns.reset_defaults()
-    isns.set_image(origin = 'upper')
+    #isns.reset_defaults()
+    isns.set_image(origin = 'lower')
     # isns image directino setting 
     
-    fig,axs = plt.subplots (nrows = 1,
-                            ncols = 3,
-                            figsize = (12,4))
+    fig,axes = plt.subplots(nrows = 2,ncols = 2,figsize = (6,6))
+    axs= axes.ravel()
 
-    isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
-                ax =  axs[0],
-                robust = True)
+    isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest"),robust = True,ax =  axs[0])
 
     # add rectangle for bbox 
     from matplotlib.patches import Rectangle
@@ -474,6 +511,7 @@ def hv_bbox_avg (xr_data, ch = 'LIX_fb' ,slicing_bias_mV = 0.5, bound_box = boun
     Bbox_y0 = np.abs((xr_data.Y-bound_box.bounds[1]).to_numpy()).argmin()
     Bbox_x1 = np.abs((xr_data.X-bound_box.bounds[2]).to_numpy()).argmin()
     Bbox_y1 = np.abs((xr_data.Y-bound_box.bounds[3]).to_numpy()).argmin()
+    Bbox = Bbox_x0,Bbox_y0,Bbox_x1,Bbox_y1
     # substract value, absolute value with numpy, argmin returns index value
 
     # when add rectangle, add_patch used index 
@@ -484,124 +522,69 @@ def hv_bbox_avg (xr_data, ch = 'LIX_fb' ,slicing_bias_mV = 0.5, bound_box = boun
                                lw=2,
                                alpha=0.5))
 
-    isns.imshow(xr_data_bbox[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
-                ax =  axs[1],
+    isns.imshow(xr_data_bbox[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),ax =  axs[1],
                 robust = True)
     sns.lineplot(x = "bias_mV",
                  y = ch, 
                  data = xr_data_bbox.to_dataframe(),
                  ax = axs[2])
+    axs[3].remove()
     #plt.savefig('grid011_bbox)p.png')
     plt.show()
     # 3 figures will be diplayed, original image with Bbox area, BBox area zoom, BBox averaged STS
-    return 
+    fig.tight_layout()
+    return xr_data_bbox, fig
     # plot STS at the selected points 
     # use the seaborn (confident interval : 95%) 
     # sns is figure-level function 
 
 
 # -
+grid_LDOS_rot_bbox,_ = hv_bbox_avg(grid_LDOS_rot, ch ='LDOS_fb',slicing_bias_mV=0.1 , bound_box = bound_box)
 
-hv_bbox_avg(grid_LDOS, ch ='LDOS_fb',bound_box= bound_box)
-
-# ## 2. gap & peak analysis (for Superconductor)
-#
-# * 2.4. Rotation ?
-#     * move it other section? 
-#
-# * 2.1. Smoothing 
-#     * 2.1.1. Savatzky Golay smoothing 
-#        * window polyoder setting 
-#
-# * 2.2. Numerical derivative 
-#     * use xr API 
-#
-# * 2.3 finding plateau
-#     * 2.3.1. prepare plateau detection function for Grid_xr, point 
-#     * 2.3.2. prepare plateau detection function for Grid_xr
-#
-
-# #### 2.4.rotate 3D_xr
-#
-# * if target area  requires rotation, use rotate_3D_xr function 
-# * thereis separate rotate_2D function 
-# * based on XR API 
-#
-#
+# ## 2.2 Smoothing 
+# ### 2.2.1. Savatzky-Golay (SG) smoothig
 
 # +
-## rotate 3D_xr # rotation in degree not radian 
-
-grid_LDOS_rot= rotate_3D_xr(grid_LDOS,rotation_angle=-45)
-# -
-
-hv_bias_mV_slicing(grid_LDOS_rot, ch ='LDOS_fb').opts(clim= (0,1E-10))
-
-# +
-import holoviews as hv
-from holoviews import opts
-hv.extension('bokeh')
-
-grid_channel_hv = hv.Dataset(grid_LDOS_rot.LDOS_fb)
-
-# bias_mV slicing
-dmap_plane  = ["X","Y"]
-dmap = grid_channel_hv.to(hv.Image,
-                          kdims = dmap_plane,
-                          dynamic = True )
-dmap.opts(colorbar = True,
-          cmap = 'bwr',
-          frame_width = 400,
-          aspect = 'equal')#.relabel('XY plane slicing: ')
-
-grid_channel_hv_image  = hv.Dataset(grid_LDOS_rot.LDOS_fb.isel(bias_mV = 0)).relabel('for BBox selection : ')
-
-bbox_points = hv.Points(grid_channel_hv_image).opts(frame_width = 400,
-                                                    color = 'k',
-                                                    aspect = 'equal',
-                                                    alpha = 0.1,                                   
-                                                    tools=['box_select'])
-
-bound_box = hv.streams.BoundsXY(source = bbox_points,
-                                bounds=(0,0,0,0))
-dmap*bbox_points
-
-
-## hv.DynamicMap( 뒤에는 function 이 와야함), streams  로 해당 영역을 지정.( or 함수의 입력정보 지정) 
-# averaged curve 를 그리기 위해서 해당영역을  xr  에서 average  해야함.. 
-# curve 의 area 로 error bar도 같이 그릴것.. 
-
-
-# -
-
-hv_bbox_avg(grid_LDOS_rot, ch ='LDOS_fb',bound_box= bound_box)
-
-# ### 2.1 Smoothing 
-# #### 2.1.1. Savatzky-Golay (SG) smoothig
-# ### 2.2. numerical derivative + SG smoothing
-#
-# #### 2.2.1. SG + 1stderiv + SG + 2nd deriv + SG
-#
-
 # grid_3D -> sg -> derivative 
-grid_3D_sg = savgolFilter_xr(grid_3D, window_length = 51, polyorder = 5)
-grid_3D_sg_1deriv = grid_3D_sg.differentiate('bias_mV')
-grid_3D_sg_1deriv_sg = savgolFilter_xr(grid_3D_sg_1deriv, window_length = 51, polyorder = 5)
-grid_3D_sg_2deriv = grid_3D_sg_1deriv_sg.differentiate('bias_mV')
-grid_3D_sg_2deriv_sg =  savgolFilter_xr(grid_3D_sg_2deriv, window_length = 51, polyorder = 5)
+grid_LDOS_rot
+
+grid_LDOS_rot_sg = savgolFilter_xr(grid_LDOS_rot, window_length = 21, polyorder = 3)
+
+# +
+
+sns.lineplot( x = 'bias_mV', y = 'LDOS_fb', data=  grid_LDOS_rot.sel(X=5E-9,Y=5E-9, method = "nearest").LDOS_fb.to_dataframe(), label ="LDOS" )
+sns.lineplot( x = 'bias_mV', y = 'LDOS_fb', data=  grid_LDOS_rot_sg.sel(X=5E-9,Y=5E-9, method = "nearest").LDOS_fb.to_dataframe(), label ="Savatzky-Golay smoothing" )
+
+plt.show()
+# -
+
+# ## 2.3 Numerical derivative 
+#     * Derivative + SG smoothing
+#
+# ### 2.3.1. SG + 1stderiv + SG + 2nd deriv + SG
+
+# +
+
+grid_LDOS_rot_sg_1deriv = grid_LDOS_rot_sg.differentiate('bias_mV')
+grid_LDOS_rot_sg_1deriv_sg = savgolFilter_xr(grid_LDOS_rot_sg_1deriv, window_length = 15, polyorder = 3)
+grid_LDOS_rot_sg_2deriv = grid_LDOS_rot_sg_1deriv_sg.differentiate('bias_mV')
+grid_LDOS_rot_sg_2deriv_sg =  savgolFilter_xr(grid_LDOS_rot_sg_2deriv, window_length = 15, polyorder = 3)
+grid_LDOS_rot_sg_2deriv_sg
+# -
 
 #
 # ### 2.3 finding plateau
-# #### 2.3.1. prepare plateau detection function for Grid_xr, point 
-# #### 2.3.2. prepare plateau detection function for Grid_xr
+#     * 2.3.1. prepare plateau detection function for Grid_xr, point 
+#     * 2.3.2. prepare plateau detection function for Grid_xr
 #
 #
 
 # #### 2.3.1. prepare plateau detection function for Grid_xr, point 
 #
-# * set  Tolerence to find plateau
+#     * set  Tolerence to find plateau
 #
-# ##### 2.3.1.1. Set tolerance for I_fb * LIX_fb
+#         * 2.3.1.1. Set tolerance for I_fb * LIX_fb
 
 # set tolerance for I_fb * LIX_fb
 tolerance_I, tolerance_dIdV, tolerance_d2IdV2 = 1E-10,1E-10,1E-10
@@ -612,82 +595,34 @@ tolerance_LIX, tolerance_dLIXdV , tolerance_d2LIXdV2  = 1E-11,1E-11,1E-11
 
 # +
 #### use the slider 
+
+xr_data =  grid_LDOS_rot_sg
+
 sliderX = pnw.IntSlider(name='X', 
                        start = 0 ,
-                       end = grid_3D.X.shape[0]) 
+                       end = xr_data.X.shape[0]) 
 sliderY = pnw.IntSlider(name='Y', 
                        start = 0 ,
-                       end = grid_3D.Y.shape[0]) 
+                       end = xr_data.Y.shape[0]) 
 
 #sliderX_v_intact = interact(lambda x:  grid_3D.X[x].values, x =sliderX)[1]
 #sliderY_v_intact = interact(lambda y:  grid_3D.Y[y].values, y =sliderY)[1]
-pn.Column(interact(lambda x:  grid_3D.X[x].values, x =sliderX), interact(lambda y: grid_3D.Y[y].values, y =sliderY))
+pn.Column(interact(lambda x:  xr_data.X[x].values, x =sliderX), interact(lambda y: xr_data.Y[y].values, y =sliderY))
 # Do not exceed the max Limit ==> error
 # how to connect interactive values to the other cell --> need to update (later) 
 # -
 
 # #### 2.3.1.2. STS curve at XY point
 
-def plot_XYslice_w_LDOS (xr_data, data_channel='LIX_fb', slicing_bias_mV = 2):
-    
-    '''
-    ################################
-    # use the slider in advance 
-    sliderX = pnw.IntSlider(name='X', 
-                           start = 0 ,
-                           end = grid_3D.X.shape[0]) 
-    sliderY = pnw.IntSlider(name='Y', 
-                           start = 0 ,
-                           end = grid_3D.Y.shape[0]) 
-
-    #sliderX_v_intact = interact(lambda x:  grid_3D.X[x].values, x =sliderX)[1]
-    #sliderY_v_intact = interact(lambda y:  grid_3D.Y[y].values, y =sliderY)[1]
-    pn.Column(interact(lambda x:  grid_3D.X[x].values, x =sliderX), interact(lambda y: grid_3D.Y[y].values, y =sliderY))
-
-    ####################################
-    
-    '''
-    
-    print("use the sliderX&Y first")
-    plt.style.use('default')
-    sliderX_v = xr_data.X[sliderX.value].values
-    sliderY_v = xr_data.Y[sliderY.value].values
-
-
-    xr_data_Hline_profile = xr_data.isel(Y = sliderY.value)[data_channel]
-
-    xr_data_Vline_profile = xr_data.isel(X = sliderX.value)[data_channel]
-    
-    # bias_mV slicing
-    fig,axes = plt.subplots (nrows = 2,
-                            ncols = 2,
-                            figsize = (6,6))
-    axs = axes.ravel()
-
-    isns.imshow(xr_data.LIX_fb.sel(bias_mV = slicing_bias_mV, method="nearest" ),
-                    ax =  axs[0],
-                    robust = True)
-    axs[0].hlines(sliderY.value,0,xr_data.X.shape[0], lw = 1, color = 'c')
-    axs[0].vlines(sliderX.value,0,xr_data.Y.shape[0], lw = 1, color = 'm')    
-
-    xr_data_Vline_profile.plot(ax = axs[1],robust = True)#, vmin = xr_data_Vline_profile.to_numpy().min() , vmax = xr_data_Vline_profile.to_numpy().max())
-    xr_data_Hline_profile.T.plot(ax = axs[2],robust = True)#, vmin = xr_data_Hline_profile.to_numpy().min() , vmax = xr_data_Hline_profile.to_numpy().max())
-
-    xr_data.LIX_fb.isel(X =sliderX.value, Y =sliderY.value) .plot(ax =axs[3])
-    #pn.Row(pn.Column(dmap_slideXY,xr_data_Vline_profile.plot()), )
-
-    fig.tight_layout()
-    return
-
-
-plot_XYslice_w_LDOS(grid_3D)
+plot_XYslice_w_LDOS(grid_LDOS_rot_sg, sliderX= sliderX, sliderY= sliderY, ch = 'LDOS_fb')
 
 # #### 2.3.1.3. Test proper tolerance levels at XY point
 
 find_plateau_tolarence_values(grid_3D,tolerance_I=1E-11, tolerance_LIX=1E-12,  x_i = sliderX.value,     y_j = sliderY.value)
 # with preset function 
 
-# #### 2.3.1.4. Display plateau region by using 1st and 2nd derviative 
+# + [markdown] jp-MarkdownHeadingCollapsed=true
+# #### 2.3.1.4. Display plateau region by using 1st and 2nd derviative (I_fb & LIX_fb) 
 # * Test proper tolerance levels at XY point continued 
 #
 
@@ -700,6 +635,8 @@ find_plateau_tolarence_values(grid_3D,tolerance_I=1E-11, tolerance_LIX=1E-12,  x
 tolerance_I, tolerance_LIX  = 1E-11, 1E-12
 tolerance_dIdV, tolerance_d2IdV2 = tolerance_I * 1,tolerance_I * 1
 tolerance_dLIXdV , tolerance_d2LIXdV2 = tolerance_LIX * 1, tolerance_LIX * 1
+
+
 x_i = sliderX.value
 y_j = sliderY.value 
 print (x_i ,y_j)
@@ -707,40 +644,40 @@ fig,axes =  plt.subplots (ncols = 2, nrows=3 , figsize = (6,9), sharex = True)
 axs = axes.ravel()
 
 # for I_fb
-grid_3D.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[0])
+grid_LDOS_rot.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[0])
 axs[0].axhline(y=tolerance_I, c='orange') # pos tolerance line
 axs[0].axhline(y=-tolerance_I, c='orange') # neg tolerance line
 # fill between x area where Y value is smaller than tolerance value 
-axs[0].fill_between(grid_3D.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
-                   where=abs(grid_3D.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
+axs[0].fill_between(grid_LDOS_rot.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
+                   where=abs(grid_LDOS_rot.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
                    facecolor='yellow', interpolate=True, alpha=0.3)
-axs[2].fill_between(grid_3D.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
-                   where=abs(grid_3D.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
+axs[2].fill_between(grid_LDOS_rot.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
+                   where=abs(grid_LDOS_rot.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
                    facecolor='yellow', interpolate=True, alpha=0.3)
 # fill area with yellow where the I_fb is plateau in dIdV curve
-axs[4].fill_between(grid_3D.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
-                   where=abs(grid_3D.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
+axs[4].fill_between(grid_LDOS_rot.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
+                   where=abs(grid_LDOS_rot.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
                    facecolor='yellow', interpolate=True, alpha=0.3)
 # fill area with yellow where the I_fb is plateau in d2Id2V curve
 axs[0].set_ylim((-tolerance_I*10, tolerance_I*10))#set ylimit for magnification
 
 
 # for LIX_fb
-grid_3D.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[1])
+grid_LDOS_rot.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[1])
 axs[1].axhline(y=tolerance_LIX, c='orange') # pos tolerance line
 axs[1].axhline(y=-tolerance_LIX, c='orange') # neg tolerance line
 # fill between x area where Y value is smaller than tolerance value 
-axs[1].fill_between(grid_3D.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
-                   where=abs(grid_3D.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
+axs[1].fill_between(grid_LDOS_rot.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                   where=abs(grid_LDOS_rot.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
                    facecolor='yellow', interpolate=True, alpha=0.3)
 
-axs[3].fill_between(grid_3D.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
-                   where=abs(grid_3D.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
+axs[3].fill_between(grid_LDOS_rot.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                   where=abs(grid_LDOS_rot.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
                    facecolor='yellow', interpolate=True, alpha=0.3)
 # fill area with yellow where the LIX_fb is plateau in dIdV curve
 
-axs[5].fill_between(grid_3D.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
-                   where=abs(grid_3D.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
+axs[5].fill_between(grid_LDOS_rot.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                   where=abs(grid_LDOS_rot.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
                    facecolor='yellow', interpolate=True, alpha=0.3)
 # fill area with yellow where the LIX_fb is plateau in dIdV curve
 
@@ -750,20 +687,20 @@ axs[1].set_ylim((-tolerance_LIX*10, tolerance_LIX*10))#set ylimit for magnificat
 
 # for I_fb after 1st derivative + smoothing 
 # dI/dV
-grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[2])
+grid_LDOS_rot_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[2])
 axs[2].axhline(y=tolerance_dIdV, c='orange') # pos tolerance line
 axs[2].axhline(y=-tolerance_dIdV, c='orange') # neg tolerance line
 # fill between x area where Y value is smaller than tolerance value 
-axs[2].fill_between(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dIdV, tolerance_dIdV, 
-                   where=abs(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_dIdV,
+axs[2].fill_between(grid_LDOS_rot_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dIdV, tolerance_dIdV, 
+                   where=abs(grid_LDOS_rot_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_dIdV,
                    facecolor='cyan', interpolate=True, alpha=0.3)
 
-axs[4].fill_between(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dIdV, tolerance_dIdV, 
-                   where=abs(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_dIdV,
+axs[4].fill_between(grid_LDOS_rot_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dIdV, tolerance_dIdV, 
+                   where=abs(grid_LDOS_rot_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_dIdV,
                    facecolor='cyan', interpolate=True, alpha=0.3)
 
-axs[0].fill_between(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dIdV, tolerance_dIdV, 
-                   where=abs(grid_3D_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_dIdV,
+axs[0].fill_between(grid_LDOS_rot_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dIdV, tolerance_dIdV, 
+                   where=abs(grid_LDOS_rot_sg_1deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_dIdV,
                    facecolor='cyan', interpolate=True, alpha=0.3)
 
 # fill area with cyan where the dIdV is plateau in d2Id2V curve
@@ -774,20 +711,20 @@ axs[2].set_ylabel("dIdV")
 
 # for LIX_fb after 1st derivative + smoothing 
 # d(LIX)/dV
-grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[3])
+grid_LDOS_rot_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[3])
 
 axs[3].axhline(y=tolerance_dLIXdV, c='orange') # pos tolerance line
 axs[3].axhline(y=-tolerance_dLIXdV, c='orange') # neg tolerance line
 # fill between x area where Y value is smaller than tolerance value 
-axs[3].fill_between(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
-                   where=abs(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
+axs[3].fill_between(grid_LDOS_rot_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
+                   where=abs(grid_LDOS_rot_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
                    facecolor='cyan', interpolate=True, alpha=0.3)
 
-axs[5].fill_between(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
-                   where=abs(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
+axs[5].fill_between(grid_LDOS_rot_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
+                   where=abs(grid_LDOS_rot_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
                    facecolor='cyan', interpolate=True, alpha=0.3)
-axs[1].fill_between(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
-                   where=abs(grid_3D_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
+axs[1].fill_between(grid_LDOS_rot_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
+                   where=abs(grid_LDOS_rot_sg_1deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
                    facecolor='cyan', interpolate=True, alpha=0.3)
 # fill area with cyan where the dLIXdV is plateau in d2Id2V curve
 
@@ -797,18 +734,18 @@ axs[3].set_ylabel("dLIXdV")
 
 # for I_fb after 2nd derivative + smoothing 
 # d2I/dV2
-grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[4])
+grid_LDOS_rot_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[4])
 axs[4].axhline(y=tolerance_d2IdV2, c='orange') # pos tolerance line
 axs[4].axhline(y=-tolerance_d2IdV2, c='orange') # neg tolerance line
 # fill between x area where Y value is smaller than tolerance value 
-axs[4].fill_between(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2IdV2, tolerance_d2IdV2, 
-                   where=abs(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2IdV2,
+axs[4].fill_between(grid_LDOS_rot_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2IdV2, tolerance_d2IdV2, 
+                   where=abs(grid_LDOS_rot_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2IdV2,
                    facecolor='magenta', interpolate=True, alpha=0.3)
-axs[0].fill_between(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2IdV2, tolerance_d2IdV2, 
-                   where=abs(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2IdV2,
+axs[0].fill_between(grid_LDOS_rot_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2IdV2, tolerance_d2IdV2, 
+                   where=abs(grid_LDOS_rot_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2IdV2,
                    facecolor='magenta', interpolate=True, alpha=0.3)
-axs[2].fill_between(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2IdV2, tolerance_d2IdV2, 
-                   where=abs(grid_3D_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2IdV2,
+axs[2].fill_between(grid_LDOS_rot_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2IdV2, tolerance_d2IdV2, 
+                   where=abs(grid_LDOS_rot_sg_2deriv_sg.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2IdV2,
                    facecolor='magenta', interpolate=True, alpha=0.3)
 
 
@@ -819,20 +756,20 @@ axs[4].set_ylabel("d2IdV2")
 
 # for LIX_fb after 2nd derivative + smoothing 
 # d2(LIX)/dV2
-grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[5])
+grid_LDOS_rot_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[5])
 
 axs[5].axhline(y=tolerance_d2LIXdV2, c='orange') # pos tolerance line
 axs[5].axhline(y=-tolerance_d2LIXdV2, c='orange') # neg tolerance line
 # fill between x area where Y value is smaller than tolerance value 
-axs[5].fill_between(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
-                   where=abs(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
+axs[5].fill_between(grid_LDOS_rot_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
+                   where=abs(grid_LDOS_rot_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
                    facecolor='magenta', interpolate=True, alpha=0.3)
 
-axs[1].fill_between(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
-                   where=abs(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
+axs[1].fill_between(grid_LDOS_rot_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
+                   where=abs(grid_LDOS_rot_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
                    facecolor='magenta', interpolate=True, alpha=0.3)
-axs[3].fill_between(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
-                   where=abs(grid_3D_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
+axs[3].fill_between(grid_LDOS_rot_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
+                   where=abs(grid_LDOS_rot_sg_2deriv_sg.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
                    facecolor='magenta', interpolate=True, alpha=0.3)
 
 axs[5].set_ylim((-tolerance_d2LIXdV2*10, tolerance_d2LIXdV2*10))#set ylimit for magnification
@@ -848,20 +785,115 @@ axs[5].set_ylabel("d2LIXdV2")
 fig.tight_layout()
 # -
 
-# #### 2.3.1.5. find_plateau  xarray 
-# * After checking which tolerance is relaible for plateau detection
-# * for SC gap..  dIdV or dLIX/dV ?
-
-grid_3D_plateau = find_plateau(grid_3D)
-
-grid_3D_sg_1deriv_sg_plateau = find_plateau(grid_3D_sg_1deriv_sg)
-grid_3D_sg_1deriv_sg_plateau
-
-
-# ## 3. peak finding and plot peaks with STS resutls 
+# #### 2.3.1.5. Display plateau region by using 1st and 2nd derviative (LDOS_fb)
+# * Test proper tolerance levels at XY point continued only for LDOS_fb
 #
 
-def find_peaks_xr(xrdata, distance = 1): 
+# +
+# use the selected point  
+# x_i,y_j = 11, 20
+# draw I & LIX, 1st derivative, 2nd derivative 
+# draw tolerance value for I &LIX 
+# fill between yellow, cyan, magenta to marking 0th, 1st, 2nd derivative plateau
+tolerance_LIX  = 1E-11
+tolerance_dLIXdV , tolerance_d2LIXdV2 = tolerance_LIX * 1, tolerance_LIX * 1
+
+
+y_j = sliderY.value 
+print (x_i ,y_j)
+fig,axes =  plt.subplots (ncols = 1, nrows=3 , figsize = (6,9), sharex = True)
+axs = axes.ravel()
+
+# for LDOS_fb
+grid_LDOS_rot_sg.LDOS_fb.isel(X = x_i, Y = y_j).plot(ax = axs[0])
+axs[0].axhline(y=tolerance_LIX, c='orange') # pos tolerance line
+axs[0].axhline(y=-tolerance_LIX, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[0].fill_between(grid_LDOS_rot_sg.LDOS_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                   where=abs(grid_LDOS_rot_sg.LDOS_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+
+axs[1].fill_between(grid_LDOS_rot_sg.LDOS_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                   where=abs(grid_LDOS_rot_sg.LDOS_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+# fill area with yellow where the LDOS_fb is plateau in dIdV curve
+
+axs[2].fill_between(grid_LDOS_rot_sg.LDOS_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                   where=abs(grid_LDOS_rot_sg.LDOS_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
+                   facecolor='yellow', interpolate=True, alpha=0.3)
+# fill area with yellow where the LDOS_fb is plateau in dIdV curve
+
+axs[0].set_ylim((-tolerance_LIX*10, tolerance_LIX*10))#set ylimit for magnification
+
+
+
+# for LDOS_fb after 1st derivative + smoothing 
+# d(LIX)/dV
+grid_LDOS_rot_sg_1deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j).plot(ax = axs[1])
+
+axs[1].axhline(y=tolerance_dLIXdV, c='orange') # pos tolerance line
+axs[1].axhline(y=-tolerance_dLIXdV, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[1].fill_between(grid_LDOS_rot_sg_1deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
+                   where=abs(grid_LDOS_rot_sg_1deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
+                   facecolor='cyan', interpolate=True, alpha=0.3)
+
+axs[2].fill_between(grid_LDOS_rot_sg_1deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
+                   where=abs(grid_LDOS_rot_sg_1deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
+                   facecolor='cyan', interpolate=True, alpha=0.3)
+axs[0].fill_between(grid_LDOS_rot_sg_1deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_dLIXdV, tolerance_dLIXdV, 
+                   where=abs(grid_LDOS_rot_sg_1deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j)) <= tolerance_dLIXdV,
+                   facecolor='cyan', interpolate=True, alpha=0.3)
+# fill area with cyan where the dLIXdV is plateau in d2Id2V curve
+
+
+axs[1].set_ylim((-tolerance_dLIXdV*10, tolerance_dLIXdV*10))#set ylimit for magnification
+axs[1].set_ylabel("dLIXdV")
+
+
+# for LDOS_fb after 2nd derivative + smoothing 
+# d2(LIX)/dV2
+grid_LDOS_rot_sg_2deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j).plot(ax = axs[2])
+
+axs[2].axhline(y=tolerance_d2LIXdV2, c='orange') # pos tolerance line
+axs[2].axhline(y=-tolerance_d2LIXdV2, c='orange') # neg tolerance line
+# fill between x area where Y value is smaller than tolerance value 
+axs[2].fill_between(grid_LDOS_rot_sg_2deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
+                   where=abs(grid_LDOS_rot_sg_2deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
+                   facecolor='magenta', interpolate=True, alpha=0.3)
+
+axs[0].fill_between(grid_LDOS_rot_sg_2deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
+                   where=abs(grid_LDOS_rot_sg_2deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
+                   facecolor='magenta', interpolate=True, alpha=0.3)
+axs[1].fill_between(grid_LDOS_rot_sg_2deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_d2LIXdV2, tolerance_d2LIXdV2, 
+                   where=abs(grid_LDOS_rot_sg_2deriv_sg.LDOS_fb.isel(X = x_i, Y = y_j)) <= tolerance_d2LIXdV2,
+                   facecolor='magenta', interpolate=True, alpha=0.3)
+
+axs[2].set_ylim((-tolerance_d2LIXdV2*10, tolerance_d2LIXdV2*10))#set ylimit for magnification
+axs[2].set_ylabel("d2LIXdV2")
+
+## how to draw a pixels 
+
+
+fig.tight_layout()
+plt.show()
+# -
+
+# #### 2.3.1.5. find_plateau  xarray 
+#     * After checking which tolerance is relaible for plateau detection
+#     * for SC gap..  dIdV or dLIX/dV ?
+#     * grid_LDOS_rot_sg
+
+grid_LDOS_rot_sg_plateau = find_plateau(grid_LDOS_rot_sg)
+
+grid_LDOS_rot_sg_1deriv_sg_plateau = find_plateau(grid_LDOS_rot_sg_1deriv_sg)
+grid_LDOS_rot_sg_1deriv_sg_plateau
+
+
+# ### 2.4. peak finding and plot peaks with STS results 
+#
+
+def find_peaks_xr(xrdata, distance = 10): 
     from scipy.signal import find_peaks
     xrdata_prcssd = xrdata.copy(deep = True)
     print('Find peaks in STS to an xarray Dataset.')
@@ -926,9 +958,252 @@ def find_peaks_xr(xrdata, distance = 1):
     return xrdata_prcssd
 #grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
 
-grid_3D_sg_2deriv_sg_dks= find_peaks_xr(-grid_3D_sg_2deriv_sg, distance = 10) 
+grid_LDOS_rot_sg_2deriv_sg_dks= find_peaks_xr(-grid_LDOS_rot_sg_2deriv_sg, distance = 10) 
 
-grid_3D_sg_2deriv_sg_dks.LIX_fb_peaks.isel(X=x_i,Y=y_j)
+grid_LDOS_rot_sg_2deriv_sg_dks
+
+
+# ### 2.5.2 STS curve with peaks  choose the selected area for line profile STS
+#     * For the line averge + pks
+#     * use the grid3D_line_avg_pks ( X or Y direction) function
+#     * For ther offset plot of line averaged dataset
+#     * use the grid_lineNpks_offset *( slcted pk with LIX limit value, + return line &pk dataframe with figure)
+
+def grid3D_line_avg_pks (xr_data, average_in =  'X',
+                         ch_l_name = 'LIX_unit_calc',
+                         distance = None,
+                         threshold = None) : 
+
+    if average_in ==  'X':
+        mean_direction = 'X'
+        line_direction = 'Y'
+        print('line_direction == Y')
+    elif average_in ==  'Y': 
+        mean_direction = 'Y'
+        line_direction = 'X'
+        print('line_direction == X')
+    else: print ('check the line STS direction in 3D dataset ')
+
+    xr_data_l = xr_data.mean( dim = mean_direction )
+    xr_data_l.attrs = xr_data.attrs.copy()
+    # add attrs manually 
+
+    ### find peaks & pad 
+    #* use the SG filter 
+    #* derivative (dim = 'bias_mV') twice 
+    #* find peaks & padding 
+
+    xr_data_l_pks=  peak_pad(
+        find_peaks_xr(
+            savgolFilter_xr(
+                savgolFilter_xr(
+                    xr_data_l.differentiate(coord='bias_mV')
+                ).differentiate(coord='bias_mV')
+            )*-1, distance = distance))
+    if average_in ==  'X':
+        xr_data_l_pks.attrs['line_direction'] ='Y'
+    elif average_in ==  'Y': 
+        xr_data_l_pks.attrs['line_direction'] ='X'
+    else: print ('check the line STS direction in 3D dataset ')
+    # smooth, deriv, smooth, derive, find peak, padding 
+    #xr_data_l_pks
+    
+    
+    # in the xr_data_l_pks
+    # choose a particular channel after pean & pad 
+    # replace the channel to original xrdata 
+    # xr_data_l_pks contains 2nd derivative results 
+    
+    for ch_names in xr_data:
+        xr_data_l_pks[ch_names] =  xr_data_l [ch_names]
+    
+    
+    return xr_data_l_pks
+#grid_3D_test_l_pk = grid3D_line_avg_pks(grid_3D, average_in= 'Y')
+#grid_3D_test_l_pk
+
+grid_LDOS_rot_sg_2deriv_sg_dks.LDOS_fb.isel(X=x_i,Y=y_j)
+
+# +
+grid_LDOS_rot_bbox =  grid_LDOS_rot.where ((grid_LDOS_rot.Y>4.3E-9)*(grid_LDOS_rot.Y<4.4E-9), drop= True).where ((grid_LDOS_rot.X>5E-10)*(grid_LDOS_rot.X<3.0E-9), drop= True)
+
+grid_LDOS_rot_bbox_sg =  savgolFilter_xr(grid_LDOS_rot_bbox, window_length=11,polyorder=3 ).where ((grid_LDOS_rot_bbox.bias_mV>-4)*(grid_LDOS_rot_bbox.bias_mV<4), drop= True)
+# -
+
+grid_LDOS_rot_bbox_sg
+
+
+grid_LDOS_rot_bbox_sg_pk  = grid3D_line_avg_pks( grid_LDOS_rot_bbox_sg ,ch_l_name ='LDOS_fb', average_in= 'Y',distance = 10, threshold = 1E-12) 
+grid_LDOS_rot_bbox_sg_pk
+
+grid_LDOS_rot_bbox_sg_slct, grid_LDOS_rot_bbox_sg_df, grid_LDOS_rot_bbox_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_rot_bbox_sg_pk,ch_l_name ='LDOS_fb', plot_y_offset= 1E-11,peak_LIX_min = 1E-12, legend_title = "X (nm)")
+plt.show()
+
+# # 3. Peaks in 3D 
+#
+#
+# * 3.1. Peak position detection 
+# * 3.1.1. SG Smoothing & Numerical derivative 
+# * 3.1.2. Find peaks in 2nd derivative 
+# * 3.1.3. Filtering Peaks only (bool) 
+#
+# * 3.2. Peak properties plot 
+# * 3.2.1. find peaks2 find_peaks_prpt
+# * 3.2.2. Peak height at peak position apply LDOS value (peak Height) 
+# * 3.2.3. Peak width plot 
+# * 3.2.4. Peak promient plot 
+#
+#
+# * 3.3. Peak and in gap states 
+#
+# * 3.3. Peaks clustering 
+#
+#
+# # 4. Fitting multi peak gaussian 
+#
+
+# ## 3.1. Peak position detection
+
+# ### 3.1.1. SG Smoothing & Numerical derivative
+#
+
+# 3.1.2. Rolling using XR 
+
+grid_LDOS['LDOS_fb_roll'] = grid_LDOS.LDOS_fb.rolling(X =3,Y = 3, bias_mV= 3, min_periods =1).mean()
+
+# +
+fig,axes = plt.subplots (ncols=2, nrows=2, figsize = (6,6))
+axs = axes.ravel()
+grid_LDOS.LDOS_fb_roll.isel(bias_mV =1).plot(ax = axs[0])
+grid_LDOS.LDOS_fb.isel(bias_mV =1).plot(ax = axs[1])
+
+grid_LDOS.LDOS_fb_roll.isel(X=1, Y=1).plot(ax = axs[2])
+grid_LDOS.LDOS_fb.isel(X=1, Y=1).plot(ax = axs[3])
+
+plt.show()
+
+
+# +
+grid_LDOS_sg = savgolFilter_xr(grid_LDOS, window_length=31, polyorder=5)
+grid_LDOS_1diff =  grid_LDOS_sg.differentiate('bias_mV')
+grid_LDOS_1diff_sg = savgolFilter_xr(grid_LDOS_1diff, window_length=31, polyorder=5)
+grid_LDOS_2diff =  grid_LDOS_1diff_sg.differentiate('bias_mV')
+grid_LDOS_2diff_sg = savgolFilter_xr(grid_LDOS_2diff, window_length=31, polyorder=5)
+
+
+
+# -
+
+# ### 3.1.2. Find peaks in 2nd derivative
+
+grid_LDOS_2diff_sg_dps = find_peaks_xr ( - grid_LDOS_2diff_sg, distance= 5)
+grid_LDOS_2diff_sg_dps_pad = peak_pad (grid_LDOS_2diff_sg_dps)
+
+
+hv_bias_mV_slicing(grid_LDOS_2diff_sg_dps_pad.where(grid_LDOS_2diff_sg_dps_pad.X<5E-9).where(grid_LDOS_2diff_sg_dps_pad.Y>3E-9), ch='LDOS_fb')
+
+
+def peak_mV_3Dxr(xr_data,ch='LIX_fb'): 
+    #after find_peaks_xr 
+    xrdata_prcssd = xr_data.copy(deep = True)
+    print('After peak finding in STS, marking in the 3D data')
+    x_axis = xr_data.X.size
+    y_axis = xr_data.Y.size
+    bias_mV_axis = xr_data.bias_mV.size
+    
+    peaks_list = xr_data[ch+'_peaks'].values
+    for data_ch in xr_data:
+        if '_peaks' in data_ch:
+            pass
+        # do nothing for channels with_peaks information  
+        else: 
+            xrdata_prcssd[data_ch+'_peaks_mV'] = xr.DataArray (
+                np.array([ xr_data.bias_mV.isin(xr_data.bias_mV[peaks_list[x,y]])
+                          for x in range(x_axis)  
+                          for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis,bias_mV_axis),
+                dims=["X", "Y","bias_mV"],
+                coords={"X": xr_data.X, "Y": xr_data.Y,  "bias_mV": xr_data.bias_mV}) 
+    return xrdata_prcssd
+
+
+# +
+grid_LDOS_zm = grid_LDOS.where(grid_LDOS.X<5E-9, drop= True).where(grid_LDOS.Y>3E-9, drop = True)
+grid_LDOS_2diff_sg_zm = grid_LDOS_2diff_sg.where(grid_LDOS_2diff_sg.X<5E-9, drop = True).where(grid_LDOS_2diff_sg.Y>3E-9, drop = True)
+## Zoom in for LDOS & LDOS 2nd derivative 
+
+
+grid_LDOS_2diff_sg_zm_dps = find_peaks_xr ( - grid_LDOS_2diff_sg_zm, distance= 10)
+grid_LDOS_2diff_sg_zm_dps_pad = peak_pad (grid_LDOS_2diff_sg_zm_dps)
+# find a peak in the Zoom in area 
+grid_LDOS_2diff_sg_zm_dps_pad
+
+
+# -
+
+def peak_mV_3Dxr(xr_data,ch='LIX_fb'): 
+    '''
+    after peak finding 
+    make a boolean 3D arrary that show peak positions 
+    
+    computation with other channels --> extract info 
+    
+    '''
+    #after find_peaks_xr 
+    xrdata_prcssd = xr_data.copy(deep = True)
+    print('After peak finding in STS, marking in the 3D data')
+    x_axis = xr_data.X.size
+    y_axis = xr_data.Y.size
+    bias_mV_axis = xr_data.bias_mV.size
+    
+    peaks_list = xr_data[ch+'_peaks'].values
+    for data_ch in xr_data:
+        if '_peaks' in data_ch:
+            pass
+        # do nothing for channels with_peaks information  
+        else: 
+            xrdata_prcssd[data_ch+'_peaks_mV'] = xr.DataArray (
+                np.array([ xr_data.bias_mV.isin(xr_data.bias_mV[peaks_list[x,y]])
+                          for x in range(x_axis)  
+                          for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis,bias_mV_axis),
+                dims=["X", "Y","bias_mV"],
+                coords={"X": xr_data.X, "Y": xr_data.Y,  "bias_mV": xr_data.bias_mV}) 
+    return xrdata_prcssd
+
+
+# +
+grid_LDOS_2diff_sg_zm_dps_pad_mV = peak_mV_3Dxr(grid_LDOS_2diff_sg_zm_dps_pad, ch= 'LDOS_fb_roll')
+#grid_LDOS_2diff_sg_zm_dps_pad_mV
+
+grid_LDOS_zm['LDOS_pk_mV'] = (grid_LDOS_2diff_sg_zm_dps_pad_mV.LDOS_fb_peaks_mV * grid_LDOS_zm.LDOS_fb).astype(float)
+#grid_LDOS_zm
+# extract the peak positions 
+# -
+
+
+
+np.save('LDOS_pk_mV.npy', grid_LDOS_zm.LDOS_pk_mV.to_numpy())
+
+# ### 3.1.3. Filtering Peaks only (bool)
+#
+# ## 3.2. Peak properties plot
+#
+# ### 3.2.1. find peaks2 find_peaks_prpt
+#
+# ### 3.2.2. Peak height at peak position apply LDOS value (peak Height)
+#
+# ### 3.2.3. Peak width plot
+#
+# ### 3.2.4. Peak promient plot
+#
+# ### 3.3. Peak and in gap states
+#
+# ## 3.3. Peaks clustering
+
+
+
+
+
+peak_mV_3Dxr(grid_LDOS_rot)
 
 # +
 fig,ax =  plt.subplots(ncols=1, nrows= 1, figsize =  (6,5))
@@ -1245,6 +1520,142 @@ grid_3D_sg_1deriv = grid_3D_sg.differentiate('bias_mV')
 grid_3D_sg_1deriv_sg = savgolFilter_xr(grid_3D_sg_1deriv, window_length = 15, polyorder = 3)
 grid_3D_sg_2deriv = grid_3D_sg_1deriv_sg.differentiate('bias_mV')
 grid_3D_sg_2deriv_sg =  savgolFilter_xr(grid_3D_sg_2deriv, window_length = 15, polyorder = 3)
+
+
+def  grid_lineNpks_offset(xr_data_l_pks, 
+                          ch_l_name = 'LIX_unit_calc',
+                          plot_y_offset= 2E-11, 
+                          peak_LIX_min = 1E-13, 
+                          fig_size = (6,8), 
+                          legend_title = None):
+    # add peak point one-by-one (no palett func in sns)
+    #  after find peak & padding
+    # use choose the channel to offset-plot 
+    # use the plot_y_offset to adjust the offset values 
+    ch_l_name = ch_l_name
+    ch_l_pk_name = ch_l_name +'_peaks_pad'
+    line_direction = xr_data_l_pks.line_direction
+    plot_y_offset  =  plot_y_offset
+    
+    sns_color_palette = "rocket"
+    #color map for fig
+    
+    #xr_data_l_pks
+    ### prepare XR dataframe for line spectroscopy plot 
+    xr_data_l_pks_ch_slct = xr_data_l_pks[[ch_l_name,ch_l_pk_name]]
+    # choose the 2 channels from 2nd derivative (to maintain the coords info) 
+
+
+    #line_direction check again 
+    
+    if xr_data_l_pks.line_direction == 'Y': 
+        spacing = xr_data_l_pks_ch_slct.Y_spacing
+    elif xr_data_l_pks.line_direction == 'X': 
+        spacing = xr_data_l_pks_ch_slct.X_spacing
+    else : 
+        print('check direction & X or Y spacing for offset') 
+
+    xr_data_l_pks_ch_slct['offset'] = (xr_data_l_pks_ch_slct[line_direction] - xr_data_l_pks_ch_slct[line_direction].min())/spacing
+    # prepare offset index channnel 
+    print (' plot_y_offset  to adjust line-by-line spacing')
+
+    xr_data_l_pks_ch_slct[ch_l_name+'_offset'] = xr_data_l_pks_ch_slct[ch_l_name] + plot_y_offset * xr_data_l_pks_ch_slct['offset']
+    # offset the curve b
+    print (xr_data_l_pks_ch_slct)
+    
+
+    ch_l_name_df_list = [] 
+    ch_l_name_pks_df_list = []
+    # prepare empty list to append dataframes in the for - loop (y_i or x_i)
+
+    #line_direction check again 
+    #########################
+    # line_diection check
+    if xr_data_l_pks_ch_slct.line_direction == 'Y': 
+        lines  = xr_data_l_pks_ch_slct.Y
+
+        for y_i, y_points in enumerate (lines):
+
+            # set min peak height (LIX amplitude =  resolution limit)
+
+            y_i_pks  = xr_data_l_pks_ch_slct[ch_l_pk_name].isel(Y = y_i).dropna(dim='peaks').astype('int32')
+            # at (i_th )Y position, select peak index for bias_mV
+            real_pks_mask = (xr_data_l_pks_ch_slct.isel(Y = y_i, bias_mV = y_i_pks.values)[ch_l_name] > peak_LIX_min).values
+            # prepare a 'temp' mask for each Y position 
+            y_i_pks_slct =  y_i_pks.where(real_pks_mask).dropna(dim='peaks').astype('int32')
+            # y_i_pks_slct with mask selection  
+
+            ch_l_name_y_i_df = xr_data_l_pks_ch_slct[ch_l_name+'_offset'].isel(Y = y_i).to_dataframe()
+            # LIX_offset  at Y_i position 
+            ch_l_name_df_list.append(ch_l_name_y_i_df)
+            
+            ch_l_name_y_i_pks_df = xr_data_l_pks_ch_slct.isel(Y = y_i, bias_mV = y_i_pks_slct.values)[ch_l_name+'_offset'].to_dataframe()
+            # selected peaks with offest Y 
+            ch_l_name_pks_df_list.append(ch_l_name_y_i_pks_df)
+            
+            # data at selected Y, & peak position, LIX_offset
+            
+    #########################
+    # line_diection check
+
+    elif xr_data_l_pks_ch_slct.line_direction == 'X': 
+        lines = xr_data_l_pks_ch_slct.X
+
+        for x_i, x_points in enumerate (lines):
+
+            # set min peak height (LIX amplitude =  resolution limit)
+
+            x_i_pks  = xr_data_l_pks_ch_slct[ch_l_pk_name].isel(X = x_i).dropna(dim='peaks').astype('int32')
+            # at (i_th )X position, select peak index for bias_mV
+            real_pks_mask = (xr_data_l_pks_ch_slct.isel(X = x_i, bias_mV = x_i_pks.values)[ch_l_name] > peak_LIX_min).values
+            # prepare a 'temp' mask for each X position 
+            x_i_pks_slct =  x_i_pks.where(real_pks_mask).dropna(dim='peaks').astype('int32')
+            # x_i_pks_slct with mask selection  
+
+            ch_l_name_x_i_df = xr_data_l_pks_ch_slct[ch_l_name+'_offset'].isel(X = x_i).to_dataframe()
+            # LIX_offset  at X_i position 
+            ch_l_name_df_list.append(ch_l_name_x_i_df)
+            ch_l_name_x_i_pks_df = xr_data_l_pks_ch_slct.isel(X = x_i, bias_mV = x_i_pks_slct.values)[ch_l_name+'_offset'].to_dataframe()
+            ch_l_name_pks_df_list.append(ch_l_name_x_i_pks_df)
+            
+            # selected peaks with offest X 
+            
+    else : 
+        print('check direction & X or Y spacing for offset') 
+    
+    ch_l_name_df = pd.concat(ch_l_name_df_list).reset_index()
+    ch_l_name_pks_df = pd.concat(ch_l_name_pks_df_list).reset_index()
+    
+    fig,ax = plt.subplots(figsize = fig_size)
+
+    sns.lineplot(data = ch_l_name_df,
+                         x ='bias_mV', 
+                         y = ch_l_name+'_offset',
+                         palette = "rocket",
+                         hue = xr_data_l_pks.line_direction,
+                         ax = ax,legend='full')
+
+    sns.scatterplot(data = ch_l_name_pks_df,
+                            x ='bias_mV',
+                            y = ch_l_name+'_offset',
+                            palette ="rocket",
+                            hue = xr_data_l_pks.line_direction,
+                            ax = ax,legend='full')
+    # legend control!( cut the handles 1/2)
+    ax.set_xlabel('Bias (mV)')   
+    #ax.set_ylabel(ch_l_name+'_offset')   
+    ax.set_ylabel('LDOS')   
+    handles0, labels0 = ax.get_legend_handles_labels()
+    handles1 = handles0[:int(len(handles0)//2)]
+    labels1 = [ str(round(float(label)*1E9,2)) for label in labels0[:int(len(labels0)//2)] ] 
+    handles2 = handles1[::5][::-1]
+    labels2 = labels1[::5][::-1]
+    # convert the line length as nm
+    print(labels2)
+    ax.legend(handles2,   labels2, title = legend_title)
+    # use the half of legends (line + scatter) --> use lines only
+    #plt.show()
+    return xr_data_l_pks_ch_slct, ch_l_name_df, ch_l_name_pks_df, fig
 
 # ### I peak detection 
 # * 1. I peak  =  dIdV plateau & dI/DV Pos
@@ -2192,6 +2603,59 @@ def plot_XYslice_w_LDOS (xr_data, data_channel='LIX_fb'):
     fig.tight_layout()
     return
 
+
+
+def plot_XYslice_w_LDOS (xr_data, sliderX, sliderY, ch ='LIX_fb', slicing_bias_mV = 2):
+    
+    '''
+    ################################
+    # use the slider in advance 
+    sliderX = pnw.IntSlider(name='X', 
+                           start = 0 ,
+                           end = grid_3D.X.shape[0]) 
+    sliderY = pnw.IntSlider(name='Y', 
+                           start = 0 ,
+                           end = grid_3D.Y.shape[0]) 
+
+    #sliderX_v_intact = interact(lambda x:  grid_3D.X[x].values, x =sliderX)[1]
+    #sliderY_v_intact = interact(lambda y:  grid_3D.Y[y].values, y =sliderY)[1]
+    pn.Column(interact(lambda x:  grid_3D.X[x].values, x =sliderX), interact(lambda y: grid_3D.Y[y].values, y =sliderY))
+
+    ####################################
+    
+    '''
+    
+    print("use the sliderX&Y first")
+    #plt.style.use('default')
+    sliderX_v = xr_data.X[sliderX.value].values
+    sliderY_v = xr_data.Y[sliderY.value].values
+
+
+    xr_data_Hline_profile = xr_data.isel(Y = sliderY.value)[ch]
+
+    xr_data_Vline_profile = xr_data.isel(X = sliderX.value)[ch]
+    
+    # bias_mV slicing
+    fig,axes = plt.subplots (nrows = 2,
+                            ncols = 2,
+                            figsize = (6,6))
+    axs = axes.ravel()
+
+    isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
+                    ax =  axs[0],
+                    robust = True)
+    axs[0].hlines(sliderY.value,0,xr_data.X.shape[0], lw = 1, color = 'c')
+    axs[0].vlines(sliderX.value,0,xr_data.Y.shape[0], lw = 1, color = 'm')    
+
+    xr_data_Vline_profile.plot(ax = axs[1],robust = True)#, vmin = xr_data_Vline_profile.to_numpy().min() , vmax = xr_data_Vline_profile.to_numpy().max())
+    xr_data_Hline_profile.T.plot(ax = axs[2],robust = True)#, vmin = xr_data_Hline_profile.to_numpy().min() , vmax = xr_data_Hline_profile.to_numpy().max())
+
+    xr_data[ch].isel(X =sliderX.value, Y =sliderY.value) .plot(ax =axs[3])
+    #pn.Row(pn.Column(dmap_slideXY,xr_data_Vline_profile.plot()), )
+
+    fig.tight_layout()
+    
+    return plt.show()
 
 
 # + [markdown] jp-MarkdownHeadingCollapsed=true
