@@ -202,9 +202,11 @@ files_df
 
 sxm_file_list_df = files_df[files_df.type == "sxm"]
 # file_list_df
-sxm_file_groups = list(set(files_df["group"]))
-# file groups
 
+# use sxm file list only 
+sxm_file_groups = list(set(sxm_file_list_df["group"]))
+# file groups
+sxm_file_groups
 #############################
 # sxm file loading by using img2xr
 # xr format으로 파일 불러오기
@@ -276,8 +278,6 @@ prs.save(pptx_file_name)
 
 # # <font color= orange > 4. add data page </font>
 
-files_df
-
 # +
 #from pptx import Presentation
 from pptx.util import Inches
@@ -329,11 +329,8 @@ for files_name in files_df.file_name:
 
 
 #pptx page 
-# +
-nap
-
-
 # -
+nap
 
 
 

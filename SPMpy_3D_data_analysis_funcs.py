@@ -28,6 +28,7 @@
 #
 # > * check **SPMpy_fileloading_functions** first.
 
+# + [markdown] jp-MarkdownHeadingCollapsed=true
 # # 0.  Import modules
 
 # +

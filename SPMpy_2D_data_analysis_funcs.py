@@ -591,7 +591,8 @@ def twoD_FFT_xr (xr_data,
     return xr_data_after_fft
 
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
+# -
+
 # ## 3. miscellaneous (data mapping functions + )
 # > data mapping ( closest, nearest, outliers) 
 # > trim additional axes in plot (trim axs) 
@@ -717,9 +718,9 @@ def trim_axs(axs, N):
 ##############################################################
 
 
+# -
 
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
 # # 4. image filtering functions (based on skimage.filters) 
 #
 # > **filters are applied to xr dataset**
@@ -940,8 +941,7 @@ isns.imshow(z_LIX_fNb_xr_butterworth.z_fwd_df_butterworth, origin = "lower")
 '''
 
 
-# -
-
+# + [markdown] jp-MarkdownHeadingCollapsed=true
 # # 5. rank filteres functions 
 # > To use "skimage.filters.rank ", input data type should be uint8/uint16
 # > * $\to$ image_to_grayscale (convert image as (0,255))
@@ -1075,8 +1075,8 @@ def filter_gs_substract_mean_xr (xrdata_gs,disk_radious=10):
 
 # # 6. Image Thresholding functions 
 # > *  Threshold selections + boolean 
-# > * treshold_flip = True : boolean T/F selection
-# * single treshold values
+# > * threshold_flip = True : boolean T/F selection
+# * single threshold values
 #     * __threshold_mean_xr__
 #     * __threshold_otsu_xr__
 #     * __threshold_minimum_xr__
@@ -1089,8 +1089,8 @@ def filter_gs_substract_mean_xr (xrdata_gs,disk_radious=10):
 #     * threshold_isodata_xr
 #         * Return threshold value(s) based on ISODATA method
 #     * __threshold_multiotsu_xr__     
-#         * multi treshold values  (using minimum_v in histogram, class number default = 3)
-# * array treshold values 
+#         * multi threshold values  (using minimum_v in histogram, class number default = 3)
+# * array threshold values 
 #     * threshold_sauvola_xr (window_size_odd = 15, k =0.2)
 #     * __threshold_local_xr__ (blocksize_odd = 15) 
 #
@@ -1103,7 +1103,7 @@ def filter_gs_substract_mean_xr (xrdata_gs,disk_radious=10):
 ###############################
 # threshold selections+ 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-# single treshold values
+# single threshold values
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # threshold_mean
 # threshold_li
@@ -1111,21 +1111,21 @@ def filter_gs_substract_mean_xr (xrdata_gs,disk_radious=10):
 # threshold_triangle
 # threshold_yen
 # ~~~~~~~~~~~~~~~~~~~~~~~~#
-# multi treshold values 
+# multi threshold values 
 # ~~~~~~~~~~~~~~~~~~~~~~~~#
 # threshold_multiotsu
 # ~~~~~~~~~~~~~~~~~~~~~~~~#
-# array treshold values 
+# array threshold values 
 # ~~~~~~~~~~~~~~~~~~~~~~~~#
 # threshold_sauvola (window_size_odd =15, k =0.2)
 # threshold_local (blocksize_odd = 15)+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
-def threshold_mean_xr (xrdata, treshold_flip = True): 
+def threshold_mean_xr (xrdata, threshold_flip = True): 
     """
     apply threshold to distinguish areas 
-    if  treshold_flip = True
+    if  threshold_flip = True
         1: larger than threshold
         0: smaller than threshold
      
@@ -1136,7 +1136,7 @@ def threshold_mean_xr (xrdata, treshold_flip = True):
     xrdata : Xarray DataSet TYPE
         DESCRIPTION.
         Input data
-    treshold_flip : Boolean TYPE, optional
+    threshold_flip : Boolean TYPE, optional
         DESCRIPTION. The default is True.
         to assign area w.r.t threshold value 
 
@@ -1153,7 +1153,7 @@ def threshold_mean_xr (xrdata, treshold_flip = True):
         xrdata.attrs['threshold'] = {ch_name+'_threshold_mean': threshold_mean_v }
         # save the threshold value to the attributes 
         xrdata_prcssd_ch_mask = xrdata[ch_name] > threshold_mean_v
-        if treshold_flip == True: 
+        if threshold_flip == True: 
             xrdata_prcssd_ch_mask = xrdata_prcssd_ch_mask
         else : 
             xrdata_prcssd_ch_mask = ~ xrdata_prcssd_ch_mask
@@ -1162,7 +1162,7 @@ def threshold_mean_xr (xrdata, treshold_flip = True):
 
 
 '''
-def threshold_li_xr (xrdata, treshold_flip = True): 
+def threshold_li_xr (xrdata, threshold_flip = True): 
     xrdata_prcssd = xrdata.copy()
     from skimage.filters import threshold_li
     for ch_name in xrdata :
@@ -1171,7 +1171,7 @@ def threshold_li_xr (xrdata, treshold_flip = True):
         xrdata.attrs['threshold'] = {ch_name+'_threshold_li': threshold_li_v }
         # save the threshold value to the attributes 
         xrdata_prcssd_ch_mask = xrdata[ch_name] > threshold_li_v
-        if treshold_flip == True: 
+        if threshold_flip == True: 
             xrdata_prcssd_ch_mask = xrdata_prcssd_ch_mask
         else : 
             xrdata_prcssd_ch_mask = ~ xrdata_prcssd_ch_mask
@@ -1180,10 +1180,10 @@ def threshold_li_xr (xrdata, treshold_flip = True):
 # threshold li take too long time to compute.. 
 '''
 
-def threshold_otsu_xr (xrdata, treshold_flip = True):
+def threshold_otsu_xr (xrdata, threshold_flip = True):
     """
     apply threshold to distinguish areas 
-    if  treshold_flip = True
+    if  threshold_flip = True
         1: larger than threshold
         0: smaller than threshold
     use the Otsu to get threshold value
@@ -1194,7 +1194,7 @@ def threshold_otsu_xr (xrdata, treshold_flip = True):
     xrdata : Xarray DataSet TYPE
         DESCRIPTION.
         Input data
-    treshold_flip : Boolean TYPE, optional
+    threshold_flip : Boolean TYPE, optional
         DESCRIPTION. The default is True.
         to assign area w.r.t threshold value 
 
@@ -1212,7 +1212,7 @@ def threshold_otsu_xr (xrdata, treshold_flip = True):
         xrdata.attrs['threshold'] = {ch_name+'_threshold_otsu': threshold_otsu_v }
         # save the threshold value to the attributes 
         xrdata_prcssd_ch_mask = xrdata[ch_name] > threshold_otsu_v
-        if treshold_flip == True: 
+        if threshold_flip == True: 
             xrdata_prcssd_ch_mask = xrdata_prcssd_ch_mask
         else : 
             xrdata_prcssd_ch_mask = ~ xrdata_prcssd_ch_mask
@@ -1220,11 +1220,11 @@ def threshold_otsu_xr (xrdata, treshold_flip = True):
     return  xrdata_prcssd
     
 
-def threshold_triangle_xr (xrdata, treshold_flip = True): 
+def threshold_triangle_xr (xrdata, threshold_flip = True): 
     """
     INPUT DATA IS supposed to be grayscale 
     apply threshold to distinguish areas 
-    if  treshold_flip = True
+    if  threshold_flip = True
         1: larger than threshold
         0: smaller than threshold
     use the triangle to get threshold value
@@ -1236,7 +1236,7 @@ def threshold_triangle_xr (xrdata, treshold_flip = True):
         DESCRIPTION.
         Input data :grayscale (0-255) 
         if not --> covert to gray scale 
-    treshold_flip : Boolean TYPE, optional
+    threshold_flip : Boolean TYPE, optional
         DESCRIPTION. The default is True.
         to assign area w.r.t threshold value 
 
@@ -1260,7 +1260,7 @@ def threshold_triangle_xr (xrdata, treshold_flip = True):
         xrdata.attrs['threshold'] = {ch_name+'_threshold_triangle': threshold_triangle_v }
         # save the threshold value to the attributes 
         xrdata_prcssd_ch_mask = xrdata_gs[ch_name] > threshold_triangle_v
-        if treshold_flip == True: 
+        if threshold_flip == True: 
             xrdata_prcssd_ch_mask = xrdata_prcssd_ch_mask
         else : 
             xrdata_prcssd_ch_mask = ~ xrdata_prcssd_ch_mask
@@ -1268,10 +1268,10 @@ def threshold_triangle_xr (xrdata, treshold_flip = True):
     return xrdata_prcssd 
 
 
-def threshold_yen_xr (xrdata, treshold_flip = True): 
+def threshold_yen_xr (xrdata, threshold_flip = True): 
     """
     apply threshold to distinguish areas 
-    if  treshold_flip = True
+    if  threshold_flip = True
         1: larger than threshold
         0: smaller than threshold
     use the yen to get threshold value
@@ -1282,7 +1282,7 @@ def threshold_yen_xr (xrdata, treshold_flip = True):
     xrdata : Xarray DataSet TYPE
         DESCRIPTION.
         Input data
-    treshold_flip : Boolean TYPE, optional
+    threshold_flip : Boolean TYPE, optional
         DESCRIPTION. The default is True.
         to assign area w.r.t threshold value 
 
@@ -1300,7 +1300,7 @@ def threshold_yen_xr (xrdata, treshold_flip = True):
         xrdata.attrs['threshold'] = {ch_name+'_threshold_yen': threshold_yen_v }
         # save the threshold value to the attributes 
         xrdata_prcssd_ch_mask = xrdata[ch_name] > threshold_yen_v
-        if treshold_flip == True: 
+        if threshold_flip == True: 
             xrdata_prcssd_ch_mask = xrdata_prcssd_ch_mask
         else : 
             xrdata_prcssd_ch_mask = ~ xrdata_prcssd_ch_mask
@@ -1308,11 +1308,11 @@ def threshold_yen_xr (xrdata, treshold_flip = True):
     return xrdata_prcssd 
     
     
-def threshold_minimum_xr (xrdata, treshold_flip = True):
+def threshold_minimum_xr (xrdata, threshold_flip = True):
     xrdata_prcssd = xrdata.copy() 
     """
     apply threshold to distinguish areas 
-    if  treshold_flip = True
+    if  threshold_flip = True
         1: larger than threshold
         0: smaller than threshold
     using minimum_v in histogram 
@@ -1323,7 +1323,7 @@ def threshold_minimum_xr (xrdata, treshold_flip = True):
     xrdata : Xarray DataSet TYPE
         DESCRIPTION.
         Input data
-    treshold_flip : Boolean TYPE, optional
+    threshold_flip : Boolean TYPE, optional
         DESCRIPTION. The default is True.
         to assign area w.r.t threshold value 
 
@@ -1340,7 +1340,7 @@ def threshold_minimum_xr (xrdata, treshold_flip = True):
         xrdata.attrs['threshold'] = {ch_name+'_threshold_minimum': threshold_minimum_v }
         # save the threshold value to the attributes 
         xrdata_prcssd_ch_mask = xrdata[ch_name] > threshold_minimum_v
-        if treshold_flip == True: 
+        if threshold_flip == True: 
             xrdata_prcssd_ch_mask = xrdata_prcssd_ch_mask
         else : 
             xrdata_prcssd_ch_mask = ~ xrdata_prcssd_ch_mask
@@ -1348,11 +1348,11 @@ def threshold_minimum_xr (xrdata, treshold_flip = True):
     return xrdata_prcssd
 
 
-def threshold_isodata_xr (xrdata, treshold_flip = True): 
+def threshold_isodata_xr (xrdata, threshold_flip = True): 
     
     """
     apply threshold to distinguish areas 
-    if  treshold_flip = True
+    if  threshold_flip = True
         1: larger than threshold
         0: smaller than threshold
     Return threshold value(s) based on ISODATA method.
@@ -1363,7 +1363,7 @@ def threshold_isodata_xr (xrdata, treshold_flip = True):
     xrdata : Xarray DataSet TYPE
         DESCRIPTION.
         Input data
-    treshold_flip : Boolean TYPE, optional
+    threshold_flip : Boolean TYPE, optional
         DESCRIPTION. The default is True.
         to assign area w.r.t threshold value 
 
@@ -1381,7 +1381,7 @@ def threshold_isodata_xr (xrdata, treshold_flip = True):
         xrdata.attrs['threshold'] = {ch_name+'_threshold_isodata': threshold_isodata_v }
         # save the threshold value to the attributes 
         xrdata_prcssd_ch_mask = xrdata[ch_name] > threshold_isodata_v
-        if treshold_flip == True: 
+        if threshold_flip == True: 
             xrdata_prcssd_ch_mask = xrdata_prcssd_ch_mask
         else : 
             xrdata_prcssd_ch_mask = ~ xrdata_prcssd_ch_mask
@@ -1427,17 +1427,17 @@ def threshold_multiotsu_xr (xrdata, multiclasses = 3):
             ch_name+'_threshold_multiotsu': threshold_multiotsu_v }
         xrdata_prcssd[ch_name].values = np.digitize(
             xrdata_gs[ch_name], bins = threshold_multiotsu_v)
-        # output is treshold value array  (len = multiclasses-1)
+        # output is threshold value array  (len = multiclasses-1)
         # use to select (np.digitize(image, bins=thresholds))
     return   xrdata_prcssd  
 
 
-def threshold_sauvola_xr (xrdata, window_size_odd = 15, treshold_flip = True): 
+def threshold_sauvola_xr (xrdata, window_size_odd = 15, threshold_flip = True): 
     """
     Applies Sauvola local threshold to an array. Sauvola is a modification of Niblack technique.
 
     apply threshold to distinguish areas 
-    if  treshold_flip = True
+    if  threshold_flip = True
         1: larger than threshold
         0: smaller than threshold
 
@@ -1451,7 +1451,7 @@ def threshold_sauvola_xr (xrdata, window_size_odd = 15, treshold_flip = True):
         DESCRIPTION. The default is 15.
         it should be an odd number 
         rectangular area selection for find local threshold value 
-    treshold_flip : Boolean TYPE, optional
+    threshold_flip : Boolean TYPE, optional
         DESCRIPTION. The default is True.
         to assign area w.r.t threshold value 
 
@@ -1467,23 +1467,23 @@ def threshold_sauvola_xr (xrdata, window_size_odd = 15, treshold_flip = True):
         print(ch_name)
         threshold_sauvola_v = threshold_sauvola(xrdata[ch_name].values, window_size = window_size_odd)
         xrdata.attrs['threshold'] = {ch_name+'_threshold_sauvola': threshold_sauvola_v }
-        # output is treshold value array (image size)  
-        # each pixel has separate treshold value
+        # output is threshold value array (image size)  
+        # each pixel has separate threshold value
         xrdata_prcssd_ch_mask = xrdata[ch_name] > threshold_sauvola_v
-        if treshold_flip == True: 
+        if threshold_flip == True: 
             xrdata_prcssd_ch_mask = xrdata_prcssd_ch_mask
         else : 
             xrdata_prcssd_ch_mask = ~ xrdata_prcssd_ch_mask
         xrdata_prcssd[ch_name] = xrdata[ch_name].where(xrdata_prcssd_ch_mask)
     return xrdata_prcssd 
 
-def threshold_local_xr (xrdata, block_size_odd = 15, treshold_flip = True): 
+def threshold_local_xr (xrdata, block_size_odd = 15, threshold_flip = True): 
     """
     Applies Local threshold to an array.
     Compute a threshold mask image based on local pixel neighborhood.
 
     apply threshold to distinguish areas 
-    if  treshold_flip = True
+    if  threshold_flip = True
         1: larger than threshold
         0: smaller than threshold
 
@@ -1496,7 +1496,7 @@ def threshold_local_xr (xrdata, block_size_odd = 15, treshold_flip = True):
         DESCRIPTION. The default is 15.
          it should be an odd number 
         rectangular area selection for find local threshold value 
-    treshold_flip : Boolean TYPE, optional
+    threshold_flip : Boolean TYPE, optional
         DESCRIPTION. The default is True.
         to assign area w.r.t threshold value 
 
@@ -1512,10 +1512,10 @@ def threshold_local_xr (xrdata, block_size_odd = 15, treshold_flip = True):
         print(ch_name)
         threshold_local_v = threshold_local(xrdata[ch_name].values,  block_size =  block_size_odd)
         xrdata.attrs['threshold'] = {ch_name+'_threshold_local': threshold_local_v }
-        # output is treshold value array (image size)  
-        # each pixel has separate treshold value
+        # output is threshold value array (image size)  
+        # each pixel has separate threshold value
         xrdata_prcssd_ch_mask = xrdata[ch_name] > threshold_local_v
-        if treshold_flip == True: 
+        if threshold_flip == True: 
             xrdata_prcssd_ch_mask = xrdata_prcssd_ch_mask
         else : 
             xrdata_prcssd_ch_mask = ~ xrdata_prcssd_ch_mask
@@ -1873,8 +1873,7 @@ def plot_2D_xr_fft(xrdata_fft,
 #############################################
 
 
-# -
-
+# + [markdown] jp-MarkdownHeadingCollapsed=true
 # # 9. Line profiles (xr DataSet) 
 #
 # > ### line profile plot of only 1 channle 
@@ -2480,9 +2479,9 @@ def line_profile2_xr(xrdata, l_pf_start, l_pf_end, ch_N = [0,2], profile_width =
 
 ##########################
 
-# -
 
 
+# + [markdown] jp-MarkdownHeadingCollapsed=true
 # #  10. pptx page adding function 
 # * **AddAnalysisSlide** function 
 

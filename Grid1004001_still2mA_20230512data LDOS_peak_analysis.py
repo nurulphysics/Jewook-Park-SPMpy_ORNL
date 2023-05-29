@@ -1043,8 +1043,10 @@ grid_LDOS_rot_bbox_sg
 grid_LDOS_rot_bbox_sg_pk  = grid3D_line_avg_pks( grid_LDOS_rot_bbox_sg ,ch_l_name ='LDOS_fb', average_in= 'Y',distance = 5, threshold = 1E-11) 
 grid_LDOS_rot_bbox_sg_pk
 
+# + jupyter={"source_hidden": true}
 grid_LDOS_rot_bbox_sg_slct, grid_LDOS_rot_bbox_sg_df, grid_LDOS_rot_bbox_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_rot_bbox_sg_pk,ch_l_name ='LDOS_fb', plot_y_offset= 2E-10,peak_LIX_min = 1E-10, legend_title = "X (nm)")
 plt.show()
+# -
 
 # # 3. Peaks in 3D 
 #
