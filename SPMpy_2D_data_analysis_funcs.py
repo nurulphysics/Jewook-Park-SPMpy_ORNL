@@ -103,7 +103,8 @@ except ModuleNotFoundError:
     import seaborn_image as isns
 
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
+# -
+
 # ## 1 : plane fit functions
 # * plane_fit_y
 # * plane_fit_x
@@ -434,8 +435,8 @@ def plane_fit_surface_xr (xrdata, order = 2):
 # masking with condition 
 # mean value checkup 
 # later 
+# -
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
 # ## 2 : TwoD FFT functions
 # * twoD_FFT
 # * twoD_FFT_df
@@ -2502,7 +2503,7 @@ def th_otsu_roi_label_2D_xr(xr_data, bias_mV_th = 0, threshold_flip = True):
     return xr_data_prcssd
     
     
-    
+
 
 # +
 # select one map & apply thresholds
@@ -2518,7 +2519,7 @@ def th_multiotsu_roi_label_2D_xr(xr_data, bias_mV_th = 200, multiclasses = 3):
     return xr_data_prcssd
     
     
-    
+
 
 # +
 # select one map & apply thresholds

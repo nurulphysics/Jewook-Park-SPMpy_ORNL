@@ -227,7 +227,7 @@ files_df[files_df.type=='3ds']#.file_name.iloc[0]
 #
 # ### 1.2.1. Convert  to xarray
 
-grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[0])
+grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[2])
 grid_xr
 
 # ## 1-2.2. Separate topography / gird_3D (I_fb, LIX_fb)
@@ -268,10 +268,17 @@ grid_LDOS
 # ### 1.4 Topography view 
 
 # +
+grid_topo = grid_topo.drop(['gap_map_I'])#.isnull().sum()
+
+
+
+
+# +
 # show topography image
 
 isns.set_image(origin =  "lower")
-isns.imshow(plane_fit_y_xr(grid_topo).topography, robust =  True, cmap= 'copper', perc = (2,98))
+#isns.imshow(plane_fit_x_xr(plane_fit_y_xr(grid_topo)).topography, robust =  True, cmap= 'copper', perc = (2,98))
+isns.imshow(plane_fit_surface_xr(plane_fit_y_xr(grid_topo), order=2).topography, robust =  True, cmap= 'copper', perc = (2,98))
 # -
 
 # ##  Grid area extract 
@@ -382,19 +389,30 @@ plt.show()
 LDOS_fb_area1_df =  bbox_1.LDOS_fb.to_dataframe()
 LDOS_fb_area2_df =  bbox_2.LDOS_fb.to_dataframe() 
 # xr to dataframe
-LDOS_fb_area1_df.columns = ['LDOS1']
-LDOS_fb_area2_df.columns = ['LDOS2']# change df names 
+LDOS_fb_area1_df.columns = ['Area1']
+LDOS_fb_area2_df.columns = ['Area2']# change df names 
 
 LDOS_fb_area_df = pd.concat( [LDOS_fb_area1_df,LDOS_fb_area2_df], axis= 1)
 LDOS_fb_area_df# = LDOS_fb_area_df.swaplevel(0,2)
 #LDOS_fb_area_df.swaplevel(0,2) # index level swap. w.r.t. 'bias_mV'
 #LDOS_fb_area_df = LDOS_fb_area_df.swaplevel(0,2).unstack().unstack() # unstack X& Y
 
-sns.lineplot(x= 'bias_mV', y ='LDOS1', data= LDOS_fb_area_df, label = 'area1')
-sns.lineplot(x= 'bias_mV', y ='LDOS2', data= LDOS_fb_area_df, label = 'area2')
-plt.show()
+
+##sns.lineplot(x= 'bias_mV', y ='LDOS1', data= LDOS_fb_area_df, label = 'area1')
+#sns.lineplot(x= 'bias_mV', y ='LDOS2', data= LDOS_fb_area_df, label = 'area2')
+#plt.show()
+# use the below sns plot instead 
+
 
 # -
+
+LDOS_fb_area_df = LDOS_fb_area_df.reset_index()
+LDOS_fb_area_df_melt = LDOS_fb_area_df.melt(id_vars = ['Y','X','bias_mV'], value_vars = ['Area1','Area2'])
+LDOS_fb_area_df_melt.columns = ['Y','X','bias_mV', 'Area','LDOS']
+LDOS_fb_area_df_melt
+
+sns.lineplot(x= 'bias_mV', y = 'LDOS', data = LDOS_fb_area_df_melt, hue ='Area')
+plt.show()
 
 fig, axs = plt.subplots(nrows = 2, figsize = (3,2))
 isns.imshow(plane_fit_y_xr(grid_topo).topography, cmap ='copper', ax = axs[0])
@@ -456,9 +474,9 @@ def th_multiotsu_roi_label_2D_xr(xr_data, bias_mV_th = 200, multiclasses = 3):
     
     
     
-# -
 
-equalize_hist_xr(grid_LDOS).LDOS_fb
+# +
+#equalize_hist_xr(grid_LDOS).LDOS_fb
 
 # +
 grid_LDOS_th= th_otsu_roi_label_2D_xr(equalize_hist_xr(grid_LDOS), bias_mV_th = -300,  threshold_flip=False)
@@ -555,7 +573,7 @@ grid_LDOS_th.LDOS_fb_th.plot()
 LDOS_fb_0_df = grid_LDOS_th.LDOS_fb.where( grid_LDOS_th.LDOS_fb_th_label ==0 ).mean(["X","Y"]).to_dataframe()
 LDOS_fb_1_df = grid_LDOS_th.LDOS_fb.where( grid_LDOS_th.LDOS_fb_th_label !=0 ).mean(["X","Y"]).to_dataframe()
 LDOS_fb__1_df = pd.concat( [LDOS_fb_0_df,LDOS_fb_1_df], axis= 1)
-LDOS_fb__1_df.columns = ['th_False','th_notnull']
+LDOS_fb__1_df.columns = ['th_False(Area2)','th_notnull(Area1)']
 LDOS_fb__1_df
 
 # +
@@ -773,11 +791,88 @@ grid_LDOS_rot_bbox,_ = hv_bbox_avg(grid_LDOS_rot, ch ='LDOS_fb',slicing_bias_mV=
 
 grid_LDOS
 
+
+
+# +
+
+def savgolFilter_xr(xrdata,window_length=7,polyorder=3): 
+    # window_length = odd number
+    #import copy
+    #xrdata_prcssd = copy.deepcopy(xrdata)
+    xrdata_prcssd = xrdata.copy()
+    print('Apply a Savitzky-Golay filter to an xarray Dataset.')
+
+    for data_ch in xrdata:
+
+        if len(xrdata[data_ch].dims) == 2:
+            print('3D data')
+            # smoothing filter only for the 3D data set
+            # ==> updaded 
+            xrdata_prcssd[data_ch]
+            ### 2D data case 
+            ### assume that coords are 'X','Y','bias_mV'
+            #### two case X,bias_mV or Y,bias_mV 
+            if 'X' in xrdata[data_ch].dims :
+                x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
+                # xrdata is X,bias_mV 
+                # use the isel(X = x) 
+                xrdata_prcssd[data_ch] = xr.DataArray (
+                    np.array (
+                        [sp.signal.savgol_filter(xrdata[data_ch].isel(X = x).values,
+                                                 window_length, 
+                                                 polyorder , 
+                                                 mode = 'nearest')
+                         for x in range(x_axis)]),
+                    dims = ["X", "bias_mV"],
+                    coords = {"X": xrdata.X,
+                              "bias_mV": xrdata.bias_mV})
+            elif 'Y' in xrdata[data_ch].dims  :                # xrdata is XY,bias_mV                 # use the isel(Y = y) 
+                y_axis = xrdata.Y.size
+                xrdata_prcssd[data_ch] = xr.DataArray (
+                    np.array (
+                        [sp.signal.savgol_filter(xrdata[data_ch].isel(Y = y).values,
+                                                 window_length, 
+                                                 polyorder , 
+                                                 mode = 'nearest')
+                         for y in range(y_axis) ]),
+                    dims = ["Y", "bias_mV"],
+                    coords = {"Y": xrdata.Y,
+                              "bias_mV": xrdata.bias_mV}
+                )
+            else: pass
+            
+        elif len(xrdata[data_ch].dims) == 3:
+            x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
+            y_axis = xrdata.Y.size
+            print (data_ch)
+            xrdata_prcssd[data_ch] = xr.DataArray (
+                np.array ([
+                    sp.signal.savgol_filter(xrdata[data_ch].isel(X = x, Y = y).values,
+                                            window_length, 
+                                            polyorder , 
+                                            mode = 'nearest')
+                    for x in range(x_axis) 
+                    for y in range(y_axis)
+                ] )t.reshape(x_axis,y_axis, xrdata.bias_mV.size),
+                dims = ["Y", "X", "bias_mV"],
+                coords = {"X": xrdata.X,
+                          "Y": xrdata.Y,
+                          "bias_mV": xrdata.bias_mV}            )
+        else : pass
+    return xrdata_prcssd
+
+#grid_2D_sg = savgolFilter_xr(grid_2D)
+#grid_2D_sg
+
+
 # +
 # grid_3D -> sg -> derivative 
 grid_LDOS_rot= grid_LDOS
 
-grid_LDOS_rot_sg = savgolFilter_xr(grid_LDOS_rot, window_length = 51, polyorder = 5)
+grid_LDOS_rot_sg = savgolFilter_xr(grid_LDOS, window_length = 51, polyorder = 5)
+# -
+
+isns.imshow(grid_LDOS.LDOS_fb.isel(bias_mV=0))
 
 # +
 
@@ -1269,10 +1364,10 @@ grid_LDOS_rot_bbox_sg =  savgolFilter_xr(grid_LDOS_rot_bbox, window_length=11,po
 grid_LDOS_rot_bbox_sg
 
 
-grid_LDOS_rot_bbox_sg_pk  = grid3D_line_avg_pks( grid_LDOS_rot_bbox_sg ,ch_l_name ='LDOS_fb', average_in= 'Y',distance = 5, threshold = 0.2E-11) 
+grid_LDOS_rot_bbox_sg_pk  = grid3D_line_avg_pks( grid_LDOS_rot_bbox_sg ,ch_l_name ='LDOS_fb', average_in= 'Y',distance = 5, threshold = 0.2E-13) 
 grid_LDOS_rot_bbox_sg_pk
 
-grid_LDOS_rot_bbox_sg_slct, grid_LDOS_rot_bbox_sg_df, grid_LDOS_rot_bbox_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_rot_bbox_sg_pk,ch_l_name ='LDOS_fb', plot_y_offset= 1E-12,peak_LIX_min = 1E-11, legend_title = "X (nm)")
+grid_LDOS_rot_bbox_sg_slct, grid_LDOS_rot_bbox_sg_df, grid_LDOS_rot_bbox_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_rot_bbox_sg_pk,ch_l_name ='LDOS_fb', plot_y_offset= 1E-13,peak_LIX_min = 1E-14, legend_title = "X (nm)")
 plt.show()
 
 # # 3. Peaks in 3D 
@@ -1381,7 +1476,7 @@ grid_LDOS_sg_pk  = grid3D_line_avg_pks( grid_LDOS_sg,ch_l_name ='LDOS_fb', avera
 grid_LDOS_sg_pk_slct, grid_LDOS_sg_df, grid_LDOS_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_sg_pk,ch_l_name ='LDOS_fb', plot_y_offset= 4E-13, legend_title = "X (nm)",peak_LIX_min = 1E-17)
 plt.show()
 
-##  save npy for tomviz 
+# #  save npy for tomviz 
 
 
 # +

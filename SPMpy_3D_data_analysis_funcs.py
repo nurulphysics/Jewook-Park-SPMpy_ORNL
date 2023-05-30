@@ -600,11 +600,12 @@ def savgolFilter_xr(xrdata,window_length=7,polyorder=3):
                                             mode = 'nearest')
                     for x in range(x_axis) 
                     for y in range(y_axis)
-                ] ).reshape(x_axis,y_axis, xrdata.bias_mV.size),
-                dims = ["X", "Y", "bias_mV"],
+                ] ).T.reshape(x_axis,y_axis, xrdata.bias_mV.size),
+                dims = ["Y", "X", "bias_mV"],
                 coords = {"X": xrdata.X,
                           "Y": xrdata.Y,
                           "bias_mV": xrdata.bias_mV}            )
+            # transpose np array to correct X&Y direction 
         else : pass
     return xrdata_prcssd
 
@@ -807,7 +808,7 @@ def find_plateau_tolarence_values (xr_data,  x_i ,     y_j , tolerance_I= 1E-10,
 
 
 # -
-def find_peaks_xr(xrdata, distance = 1): 
+def find_peaks_xr(xrdata, threshold=None, distance=None): 
     from scipy.signal import find_peaks
     xrdata_prcssd = xrdata.copy(deep = True)
     print('Find peaks in STS to an xarray Dataset.')
@@ -830,7 +831,7 @@ def find_peaks_xr(xrdata, distance = 1):
                 #print(xrdata_prcssd[data_ch])
 
                 xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                    np.array([ find_peaks(xrdata[data_ch].isel(X = x).values, distance = distance)
+                    np.array([ find_peaks(xrdata[data_ch].isel(X = x).values, distance = distance, threshold = threshold)
                               for x in range(x_axis)], dtype = object )[:,0],
                 dims=["X"],
                 coords={"X": xrdata.X})
@@ -843,7 +844,7 @@ def find_peaks_xr(xrdata, distance = 1):
                 #print(xrdata_prcssd[data_ch])
 
                 xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                    np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values, distance = distance)
+                    np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values, distance = distance,threshold = threshold)
                               for y in range(y_axis)], dtype = object )[:,0],
                 dims=["Y"],
                 coords={"Y": xrdata.Y})
@@ -859,7 +860,7 @@ def find_peaks_xr(xrdata, distance = 1):
                                                              dims=["X", "Y"],
                                                              coords={"X": xrdata.X, "Y": xrdata.Y} )"""
             xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values, distance = distance)[0] 
+                np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values, distance = distance,threshold = threshold)[0] 
                           for x in range(x_axis)  
                           for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis),
                 dims=["X", "Y"],
@@ -867,7 +868,7 @@ def find_peaks_xr(xrdata, distance = 1):
         elif len(xrdata[data_ch].dims) == 1:
             if 'bias_mV' in xrdata.dims: 
                 for data_ch in xrdata: 
-                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch], distance = distance))
+                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch], distance = distance,threshold = threshold))
         else : pass
     return xrdata_prcssd
 #grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
@@ -1227,7 +1228,7 @@ def grid3D_line_avg_pks (xr_data, average_in =  'X',
                 savgolFilter_xr(
                     xr_data_l.differentiate(coord='bias_mV')
                 ).differentiate(coord='bias_mV')
-            )*-1, distance = distance))
+            )*-1, distance = distance, height = threshold))
     if average_in ==  'X':
         xr_data_l_pks.attrs['line_direction'] ='Y'
     elif average_in ==  'Y': 
