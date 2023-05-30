@@ -1527,9 +1527,9 @@ def threshold_local_xr (xrdata, block_size_odd = 15, threshold_flip = True):
 # test
 # all works well except li.. (it takes too long time) 
 
+# -
 
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
 # # 7. Image equalization functions 
 # *  **rescale_intensity_xr** function
 #     * image_rescale : robust in isns plot ( eg, plot image percentile 0.02~ 0.98)
@@ -1873,7 +1873,8 @@ def plot_2D_xr_fft(xrdata_fft,
 #############################################
 
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
+# -
+
 # # 9. Line profiles (xr DataSet) 
 #
 # > ### line profile plot of only 1 channle 
@@ -2479,9 +2480,63 @@ def line_profile2_xr(xrdata, l_pf_start, l_pf_end, ch_N = [0,2], profile_width =
 
 ##########################
 
+# -
 
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
+
+
+# ### threshold map + labeling area 
+#
+
+# +
+# select one map & apply thresholds
+# choose reference map using bias_mV,
+# otsu threholde. 
+
+
+def th_otsu_roi_label_2D_xr(xr_data, bias_mV_th = 0, threshold_flip = True):
+    xr_data_prcssd = xr_data.copy()
+    xr_data_prcssd['LDOS_fb_th'] = threshold_otsu_xr (xr_data.sel(bias_mV=bias_mV_th, method="nearest"), threshold_flip= threshold_flip).LDOS_fb
+    xr_data_prcssd['LDOS_fb_th_label'] = xr_data_prcssd['LDOS_fb_th'].copy()
+    xr_data_prcssd['LDOS_fb_th_label'].values = skimage.measure.label(xr_data_prcssd.LDOS_fb_th.values)
+    return xr_data_prcssd
+    
+    
+    
+
+# +
+# select one map & apply thresholds
+# choose reference map using bias_mV,
+# otsu threholde. 
+
+
+def th_multiotsu_roi_label_2D_xr(xr_data, bias_mV_th = 200, multiclasses = 3):
+    xr_data_prcssd = xr_data.copy()
+    xr_data_prcssd['LDOS_fb_th'] = threshold_multiotsu_xr(xr_data.sel(bias_mV=bias_mV_th, method="nearest"), multiclasses = multiclasses).LDOS_fb
+    xr_data_prcssd['LDOS_fb_th_label'] = xr_data_prcssd['LDOS_fb_th'].copy()
+    xr_data_prcssd['LDOS_fb_th_label'].values = skimage.measure.label(xr_data_prcssd.LDOS_fb_th.values)
+    return xr_data_prcssd
+    
+    
+    
+
+# +
+# select one map & apply thresholds
+# choose reference map using bias_mV,
+# otsu threholde. 
+
+
+def th_mean_roi_label_2D_xr(xr_data, bias_mV_th = 200, threshold_flip = False):
+    xr_data_prcssd = xr_data.copy()
+    xr_data_prcssd['LDOS_fb_th'] = threshold_mean_xr(xr_data.sel(bias_mV=bias_mV_th, method="nearest"), threshold_flip= threshold_flip).LDOS_fb
+    xr_data_prcssd['LDOS_fb_th_label'] = xr_data_prcssd['LDOS_fb_th'].copy()
+    xr_data_prcssd['LDOS_fb_th_label'].values = skimage.measure.label(xr_data_prcssd.LDOS_fb_th.values)
+    return xr_data_prcssd
+    
+    
+    
+# -
+
 # #  10. pptx page adding function 
 # * **AddAnalysisSlide** function 
 
