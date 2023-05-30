@@ -598,10 +598,10 @@ def savgolFilter_xr(xrdata,window_length=7,polyorder=3):
                                             window_length, 
                                             polyorder , 
                                             mode = 'nearest')
-                    for x in range(x_axis) 
-                    for y in range(y_axis)
-                ] ).T.reshape(x_axis,y_axis, xrdata.bias_mV.size),
-                dims = ["Y", "X", "bias_mV"],
+                    for y in range(y_axis) 
+                    for x in range(x_axis)
+                ] ).reshape(x_axis,y_axis, xrdata.bias_mV.size),
+                dims = ["X", "Y", "bias_mV"],
                 coords = {"X": xrdata.X,
                           "Y": xrdata.Y,
                           "bias_mV": xrdata.bias_mV}            )

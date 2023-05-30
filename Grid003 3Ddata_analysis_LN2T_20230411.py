@@ -846,18 +846,19 @@ def savgolFilter_xr(xrdata,window_length=7,polyorder=3):
             y_axis = xrdata.Y.size
             print (data_ch)
             xrdata_prcssd[data_ch] = xr.DataArray (
-                np.array ([
+                np.transpose(np.array ([
                     sp.signal.savgol_filter(xrdata[data_ch].isel(X = x, Y = y).values,
                                             window_length, 
                                             polyorder , 
                                             mode = 'nearest')
                     for x in range(x_axis) 
                     for y in range(y_axis)
-                ] )t.reshape(x_axis,y_axis, xrdata.bias_mV.size),
-                dims = ["Y", "X", "bias_mV"],
+                ] ), (1,0,2)).reshape(x_axis,y_axis, xrdata.bias_mV.size),
+                dims = ["X", "Y", "bias_mV"],
                 coords = {"X": xrdata.X,
                           "Y": xrdata.Y,
                           "bias_mV": xrdata.bias_mV}            )
+            # transpose np array to correct X&Y direction 
         else : pass
     return xrdata_prcssd
 
@@ -872,7 +873,9 @@ grid_LDOS_rot= grid_LDOS
 grid_LDOS_rot_sg = savgolFilter_xr(grid_LDOS, window_length = 51, polyorder = 5)
 # -
 
-isns.imshow(grid_LDOS.LDOS_fb.isel(bias_mV=0))
+grid_LDOS
+
+isns.imshow(grid_LDOS_rot_sg.LDOS_fb.isel(bias_mV=0))
 
 # +
 
@@ -916,6 +919,8 @@ tolerance_LIX, tolerance_dLIXdV , tolerance_d2LIXdV2  = 1E-11,1E-11,1E-11
 # #### 2.3.1.2. Using hovolview, XY selection 
 # * Choose a point for peak detection 
 
+grid_LDOS_rot_sg
+
 # +
 #### use the slider 
 
@@ -935,9 +940,62 @@ pn.Column(interact(lambda x:  xr_data.X[x].values, x =sliderX), interact(lambda 
 # how to connect interactive values to the other cell --> need to update (later) 
 # -
 
+def plot_XYslice_w_LDOS (xr_data, sliderX, sliderY, ch ='LIX_fb', slicing_bias_mV = 2):
+    
+    '''
+    ################################
+    # use the slider in advance 
+    sliderX = pnw.IntSlider(name='X', 
+                           start = 0 ,
+                           end = grid_3D.X.shape[0]) 
+    sliderY = pnw.IntSlider(name='Y', 
+                           start = 0 ,
+                           end = grid_3D.Y.shape[0]) 
+
+    #sliderX_v_intact = interact(lambda x:  grid_3D.X[x].values, x =sliderX)[1]
+    #sliderY_v_intact = interact(lambda y:  grid_3D.Y[y].values, y =sliderY)[1]
+    pn.Column(interact(lambda x:  grid_3D.X[x].values, x =sliderX), interact(lambda y: grid_3D.Y[y].values, y =sliderY))
+
+    ####################################
+    
+    '''
+    
+    print("use the sliderX&Y first")
+    #plt.style.use('default')
+    sliderX_v = xr_data.X[sliderX.value].values
+    sliderY_v = xr_data.Y[sliderY.value].values
+
+
+    xr_data_Hline_profile = xr_data.isel(Y = sliderY.value)[ch]
+
+    xr_data_Vline_profile = xr_data.isel(X = sliderX.value)[ch]
+    
+    # bias_mV slicing
+    fig,axes = plt.subplots (nrows = 2,
+                            ncols = 2,
+                            figsize = (6,6))
+    axs = axes.ravel()
+
+    isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),ax =  axs[0],robust = True)
+    
+    axs[0].hlines(sliderY.value,0,xr_data.X.shape[0], lw = 2, color = 'c')
+    axs[0].vlines(sliderX.value,0,xr_data.Y.shape[0], lw = 1, color = 'm')    
+
+    xr_data_Vline_profile.plot(ax = axs[1],robust = True)#, vmin = xr_data_Vline_profile.to_numpy().min() , vmax = xr_data_Vline_profile.to_numpy().max())
+    xr_data_Hline_profile.T.plot(ax = axs[2],robust = True)#, vmin = xr_data_Hline_profile.to_numpy().min() , vmax = xr_data_Hline_profile.to_numpy().max())
+
+    xr_data[ch].isel(X =sliderX.value, Y =sliderY.value) .plot(ax =axs[3])
+    #pn.Row(pn.Column(dmap_slideXY,xr_data_Vline_profile.plot()), )
+
+    fig.tight_layout()
+    
+    return plt.show()
+
 # #### 2.3.1.2. STS curve at XY point
 
-plot_XYslice_w_LDOS(grid_LDOS_rot_sg, sliderX= sliderX, sliderY= sliderY, ch = 'LDOS_fb')
+grid_LDOS_rot_sg
+
+plot_XYslice_w_LDOS(grid_LDOS_rot_sg, sliderX= sliderX, sliderY= sliderY, ch = 'LDOS_fb',slicing_bias_mV = 10)
 
 # #### 2.3.1.3. Test proper tolerance levels at XY point
 
