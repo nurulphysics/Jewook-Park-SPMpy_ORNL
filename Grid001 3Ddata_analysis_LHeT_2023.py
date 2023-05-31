@@ -473,7 +473,7 @@ def th_multiotsu_roi_label_2D_xr(xr_data, bias_mV_th = 200, multiclasses = 3):
     return xr_data_prcssd
     
     
-    
+
 
 # +
 #equalize_hist_xr(grid_LDOS).LDOS_fb
@@ -791,79 +791,6 @@ grid_LDOS_rot_bbox,_ = hv_bbox_avg(grid_LDOS_rot, ch ='LDOS_fb',slicing_bias_mV=
 
 grid_LDOS
 
-
-
-# +
-
-def savgolFilter_xr(xrdata,window_length=7,polyorder=3): 
-    # window_length = odd number
-    #import copy
-    #xrdata_prcssd = copy.deepcopy(xrdata)
-    xrdata_prcssd = xrdata.copy()
-    print('Apply a Savitzky-Golay filter to an xarray Dataset.')
-
-    for data_ch in xrdata:
-
-        if len(xrdata[data_ch].dims) == 2:
-            print('3D data')
-            # smoothing filter only for the 3D data set
-            # ==> updaded 
-            xrdata_prcssd[data_ch]
-            ### 2D data case 
-            ### assume that coords are 'X','Y','bias_mV'
-            #### two case X,bias_mV or Y,bias_mV 
-            if 'X' in xrdata[data_ch].dims :
-                x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
-                # xrdata is X,bias_mV 
-                # use the isel(X = x) 
-                xrdata_prcssd[data_ch] = xr.DataArray (
-                    np.array (
-                        [sp.signal.savgol_filter(xrdata[data_ch].isel(X = x).values,
-                                                 window_length, 
-                                                 polyorder , 
-                                                 mode = 'nearest')
-                         for x in range(x_axis)]),
-                    dims = ["X", "bias_mV"],
-                    coords = {"X": xrdata.X,
-                              "bias_mV": xrdata.bias_mV})
-            elif 'Y' in xrdata[data_ch].dims  :                # xrdata is XY,bias_mV                 # use the isel(Y = y) 
-                y_axis = xrdata.Y.size
-                xrdata_prcssd[data_ch] = xr.DataArray (
-                    np.array (
-                        [sp.signal.savgol_filter(xrdata[data_ch].isel(Y = y).values,
-                                                 window_length, 
-                                                 polyorder , 
-                                                 mode = 'nearest')
-                         for y in range(y_axis) ]),
-                    dims = ["Y", "bias_mV"],
-                    coords = {"Y": xrdata.Y,
-                              "bias_mV": xrdata.bias_mV}
-                )
-            else: pass
-            
-        elif len(xrdata[data_ch].dims) == 3:
-            x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
-            y_axis = xrdata.Y.size
-            print (data_ch)
-            xrdata_prcssd[data_ch] = xr.DataArray (
-                np.transpose(np.array ([
-                    sp.signal.savgol_filter(xrdata[data_ch].isel(X = x, Y = y).values,
-                                            window_length, 
-                                            polyorder , 
-                                            mode = 'nearest')
-                    for x in range(x_axis) 
-                    for y in range(y_axis)
-                ] ), (1,0,2)).reshape(x_axis,y_axis, xrdata.bias_mV.size),
-                dims = ["X", "Y", "bias_mV"],
-                coords = {"X": xrdata.X,
-                          "Y": xrdata.Y,
-                          "bias_mV": xrdata.bias_mV}            )
-            # transpose np array to correct X&Y direction 
-        else : pass
-    return xrdata_prcssd
-
-#grid_2D_sg = savgolFilter_xr(grid_2D)
-#grid_2D_sg
 
 
 # +
@@ -1468,8 +1395,8 @@ grid_LDOS_rot
 # +
 import matplotlib.patches as patches
 
-rec_x0, rec_y0 = 2E-9,1.1E-8
-rec_width,rec_height = 8E-9, 0.5E-9
+rec_x0, rec_y0 = 7E-9,2.1E-8
+rec_width,rec_height = 2E-8, 0.5E-9
 
 grid_LDOS_zm = grid_LDOS.where( (grid_LDOS.X >rec_x0)&(grid_LDOS.X <rec_x0+rec_width)&(grid_LDOS.Y >rec_y0) &(grid_LDOS.Y <rec_y0+rec_height ), drop = True)
 grid_topo_zm = grid_topo.where( (grid_LDOS.X >rec_x0)&(grid_LDOS.X <rec_x0+rec_width)&(grid_LDOS.Y >rec_y0) &(grid_LDOS.Y <rec_y0+rec_height ), drop = True)
@@ -1528,10 +1455,10 @@ hv_XY_slicing(grid_LDOS_2diff_sg, slicing='Y' , ch='LDOS_fb')#.opts(clim = (0,5E
 #hv_bias_mV_slicing(grid_LDOS_2diff_sg_dps_pad.where(grid_LDOS_2diff_sg_dps_pad.X<5E-9).where(grid_LDOS_2diff_sg_dps_pad.Y>3E-9), ch='LDOS_fb')
 # -
 
-grid_LDOS_sg_pk  = grid3D_line_avg_pks( grid_LDOS_sg,ch_l_name ='LDOS_fb', average_in= 'Y',distance = 10, threshold = (1E-17)) 
+grid_LDOS_sg_pk  = grid3D_line_avg_pks( grid_LDOS_sg,ch_l_name ='LDOS_fb', average_in= 'Y',distance = 100, threshold = (1E-16)) 
 #grid_LDOS_sg_pk
 
-grid_LDOS_sg_pk_slct, grid_LDOS_sg_df, grid_LDOS_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_sg_pk,ch_l_name ='LDOS_fb', plot_y_offset= 4E-13, legend_title = "X (nm)",peak_LIX_min = 1E-17)
+grid_LDOS_sg_pk_slct, grid_LDOS_sg_df, grid_LDOS_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_sg_pk,ch_l_name ='LDOS_fb', plot_y_offset= 1E-12, legend_title = "X (nm)",peak_LIX_min = 1E-17)
 plt.show()
 
 # #  save npy for tomviz 
