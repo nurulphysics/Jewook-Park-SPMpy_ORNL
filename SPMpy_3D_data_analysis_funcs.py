@@ -861,8 +861,8 @@ def find_peaks_xr(xrdata, threshold=None, distance=None):
                                                              coords={"X": xrdata.X, "Y": xrdata.Y} )"""
             xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
                 np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values, distance = distance,threshold = threshold)[0] 
-                          for x in range(x_axis)  
-                          for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis),
+                          for y in range(y_axis)  
+                          for x in range(x_axis)], dtype = object ).reshape(x_axis,y_axis),
                 dims=["X", "Y"],
                 coords={"X": xrdata.X, "Y": xrdata.Y})         
         elif len(xrdata[data_ch].dims) == 1:
@@ -926,8 +926,8 @@ def find_peak_properties_xr(xrdata):
                                                              coords={"X": xrdata.X, "Y": xrdata.Y} )"""
             xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
                 np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values)[1] 
-                          for x in range(x_axis)  
-                          for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis),
+                          for y in range(y_axis)  
+                          for x in range(x_axis)], dtype = object ).reshape(x_axis,y_axis),
                 dims=["X", "Y"],
                 coords={"X": xrdata.X, "Y": xrdata.Y})         
         elif len(xrdata[data_ch].dims) == 1:
@@ -1228,7 +1228,7 @@ def grid3D_line_avg_pks (xr_data, average_in =  'X',
                 savgolFilter_xr(
                     xr_data_l.differentiate(coord='bias_mV')
                 ).differentiate(coord='bias_mV')
-            )*-1, distance = distance, height = threshold))
+            )*-1, distance = distance, threshold = threshold))
     if average_in ==  'X':
         xr_data_l_pks.attrs['line_direction'] ='Y'
     elif average_in ==  'Y': 

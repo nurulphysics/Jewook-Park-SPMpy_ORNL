@@ -29,7 +29,7 @@
 # ## **Sample** :<font color= White, font size="5" > $FeTe_{0.55}Se_{0.45}$ (old) </font> 
 #     * Cleaving: @ UHV Loadlock chamber, Room temp.
 # ## **Tip: PtIr (from Unisoku)**
-# ## Measurement temp: LN2T (77.4 K)
+# ## Measurement temp: mK (40 mK)
 #
 
 # # <font color= orange > 0. Preparation  </font>
@@ -312,13 +312,13 @@ isns.imshow(plane_fit_surface_xr(plane_fit_y_xr(grid_topo), order=2).topography,
 #     * hv_bias_mV_slicing
 #     * hv_XY_slicing
 
-hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb',frame_width=400).opts(clim = (0,1.0E-11))
+hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb',frame_width=400)#.opts(clim = (0,1.0E-11))
 #hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb').opts(clim = (0,1.5E-10)) # adjust cbar limit
 
 # ####  1.5.2. Y or X slicing 
 
-hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y')#.opts(clim=(0, 1E-10)) 
-#hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X').opts(clim=(0, 0.2E-10)) # check low intensity area
+#hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y')#.opts(clim=(0, 1E-10)) 
+hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X').opts(clim=(0, 2E-10)) # check low intensity area
 #hv_XY_slicing(grid_3D,slicing= 'Y').opts(clim=(0, 1E-11))
 
 
@@ -800,7 +800,7 @@ grid_LDOS_rot= grid_LDOS
 grid_LDOS_rot_sg = savgolFilter_xr(grid_LDOS, window_length = 51, polyorder = 5)
 # -
 
-grid_LDOS
+isns.imshow(grid_LDOS_rot.LDOS_fb.isel(bias_mV=0))
 
 isns.imshow(grid_LDOS_rot_sg.LDOS_fb.isel(bias_mV=0))
 
@@ -1395,8 +1395,8 @@ grid_LDOS_rot
 # +
 import matplotlib.patches as patches
 
-rec_x0, rec_y0 = 7E-9,2.1E-8
-rec_width,rec_height = 2E-8, 0.5E-9
+rec_x0, rec_y0 = 5.4E-9,4E-9
+rec_width,rec_height = 0.8E-9, 12E-9
 
 grid_LDOS_zm = grid_LDOS.where( (grid_LDOS.X >rec_x0)&(grid_LDOS.X <rec_x0+rec_width)&(grid_LDOS.Y >rec_y0) &(grid_LDOS.Y <rec_y0+rec_height ), drop = True)
 grid_topo_zm = grid_topo.where( (grid_LDOS.X >rec_x0)&(grid_LDOS.X <rec_x0+rec_width)&(grid_LDOS.Y >rec_y0) &(grid_LDOS.Y <rec_y0+rec_height ), drop = True)
@@ -1446,7 +1446,7 @@ grid_LDOS_2diff_sg_dps_pad = peak_pad (grid_LDOS_2diff_sg_dps)
 
 
 # +
-hv_XY_slicing(grid_LDOS_2diff_sg, slicing='Y' , ch='LDOS_fb')#.opts(clim = (0,5E-10))
+hv_XY_slicing(grid_LDOS_2diff_sg, slicing='X' , ch='LDOS_fb')#.opts(clim = (0,5E-10))
 # 2deriv plot
 
 #hv_XY_slicing(grid_LDOS_sg, slicing='Y' , ch='LDOS_fb')#.opts(clim = (0,5E-10))
@@ -1455,10 +1455,10 @@ hv_XY_slicing(grid_LDOS_2diff_sg, slicing='Y' , ch='LDOS_fb')#.opts(clim = (0,5E
 #hv_bias_mV_slicing(grid_LDOS_2diff_sg_dps_pad.where(grid_LDOS_2diff_sg_dps_pad.X<5E-9).where(grid_LDOS_2diff_sg_dps_pad.Y>3E-9), ch='LDOS_fb')
 # -
 
-grid_LDOS_sg_pk  = grid3D_line_avg_pks( grid_LDOS_sg,ch_l_name ='LDOS_fb', average_in= 'Y',distance = 100, threshold = (1E-16)) 
+grid_LDOS_sg_pk  = grid3D_line_avg_pks( grid_LDOS_sg,ch_l_name ='LDOS_fb', average_in= 'X',distance = 100, threshold = (1E-16)) 
 #grid_LDOS_sg_pk
 
-grid_LDOS_sg_pk_slct, grid_LDOS_sg_df, grid_LDOS_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_sg_pk,ch_l_name ='LDOS_fb', plot_y_offset= 1E-12, legend_title = "X (nm)",peak_LIX_min = 1E-17)
+grid_LDOS_sg_pk_slct, grid_LDOS_sg_df, grid_LDOS_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_sg_pk,ch_l_name ='LDOS_fb', plot_y_offset= 1E-11, legend_title = "X (nm)",peak_LIX_min = 1E-17)
 plt.show()
 
 # #  save npy for tomviz 
