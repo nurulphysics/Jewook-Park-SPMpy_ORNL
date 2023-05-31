@@ -74,7 +74,6 @@
 #     
 #
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
 # ## <font color=blue>0. Choose the working folder </font>
 #
 
@@ -152,6 +151,7 @@ def files_in_folder(path_input):
     grid_file_list = (glob.glob('*.3ds')) 
     csv_file_list = (glob.glob('*.csv')) 
     gwy_file_list = (glob.glob('*.gwy')) 
+    xlsx_file_list = (glob.glob('*.xlsx')) 
     # using "glob"  all " *.sxm" files  in file_list
     #####################################
     ## sxm file
@@ -177,8 +177,15 @@ def files_in_folder(path_input):
                                      for file in gwy_file_list],
         columns =['group','num','file_name'])   
     
-    file_list_df = pd.concat ([file_list_sxm_df, file_list_3ds_df, file_list_csv_df, file_list_gwy_df],ignore_index= True)
+    ## excel file
+    file_list_xlsx_df = pd.DataFrame([[
+        file[:-5], np.nan, file] 
+                                     for file in xlsx_file_list],
+        columns =['group','num','file_name']) 
+    
+    file_list_df = pd.concat ([file_list_sxm_df, file_list_3ds_df, file_list_csv_df, file_list_gwy_df,file_list_xlsx_df],ignore_index= True)
     file_list_df['type'] = [file_name[-3:] for file_name in  file_list_df.file_name]
+    file_list_df.type [ file_list_df.type == 'lsx']  = 'xlsx'
     print (file_list_df)
 
     
