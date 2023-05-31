@@ -1388,9 +1388,6 @@ plt.show()
 # +
 
 grid_LDOS
-# -
-
-grid_LDOS_rot
 
 # +
 import matplotlib.patches as patches
@@ -1428,6 +1425,80 @@ plt.show()
 sns.lineplot(x =  'X', y= 'topography', data = grid_topo_zm.topography.to_dataframe())
 plt.show()
 
+
+# +
+
+def savgolFilter_xr(xrdata,window_length=7,polyorder=3): 
+    # window_length = odd number
+    #import copy
+    #xrdata_prcssd = copy.deepcopy(xrdata)
+    xrdata_prcssd = xrdata.copy()
+    print('Apply a Savitzky-Golay filter to an xarray Dataset.')
+
+    for data_ch in xrdata:
+
+        if len(xrdata[data_ch].dims) == 2:
+            print('3D data')
+            # smoothing filter only for the 3D data set
+            # ==> updaded 
+            xrdata_prcssd[data_ch]
+            ### 2D data case 
+            ### assume that coords are 'X','Y','bias_mV'
+            #### two case X,bias_mV or Y,bias_mV 
+            if 'X' in xrdata[data_ch].dims :
+                x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
+                # xrdata is X,bias_mV 
+                # use the isel(X = x) 
+                xrdata_prcssd[data_ch] = xr.DataArray (
+                    np.array (
+                        [sp.signal.savgol_filter(xrdata[data_ch].isel(X = x).values,
+                                                 window_length, 
+                                                 polyorder , 
+                                                 mode = 'nearest')
+                         for x in range(x_axis)]),
+                    dims = ["X", "bias_mV"],
+                    coords = {"X": xrdata.X,
+                              "bias_mV": xrdata.bias_mV})
+            elif 'Y' in xrdata[data_ch].dims  :                # xrdata is XY,bias_mV                 # use the isel(Y = y) 
+                y_axis = xrdata.Y.size
+                xrdata_prcssd[data_ch] = xr.DataArray (
+                    np.array (
+                        [sp.signal.savgol_filter(xrdata[data_ch].isel(Y = y).values,
+                                                 window_length, 
+                                                 polyorder , 
+                                                 mode = 'nearest')
+                         for y in range(y_axis) ]),
+                    dims = ["Y", "bias_mV"],
+                    coords = {"Y": xrdata.Y,
+                              "bias_mV": xrdata.bias_mV}
+                )
+            else: pass
+            
+        elif len(xrdata[data_ch].dims) == 3:
+            x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
+            y_axis = xrdata.Y.size
+            print (data_ch)
+            xrdata_prcssd[data_ch] = xr.DataArray (
+                np.array ([
+                    sp.signal.savgol_filter(xrdata[data_ch].isel(X = x, Y = y).values,
+                                            window_length, 
+                                            polyorder , 
+                                            mode = 'nearest')
+                    for y in range(y_axis) 
+                    for x in range(x_axis)
+                ] ).reshape(y_axis,x_axis, xrdata.bias_mV.size),
+                dims = ["Y", "X", "bias_mV"],
+                coords = {"X": xrdata.X,
+                          "Y": xrdata.Y,
+                          "bias_mV": xrdata.bias_mV}            )
+            # transpose np array to correct X&Y direction 
+        else : pass
+    return xrdata_prcssd
+
+#grid_2D_sg = savgolFilter_xr(grid_2D)
+#grid_2D_sg
+
+
 # +
 grid_LDOS_sg = savgolFilter_xr(grid_LDOS_zm, window_length=61, polyorder=4)
 grid_LDOS_1diff =  grid_LDOS_sg.differentiate('bias_mV')
@@ -1440,6 +1511,10 @@ grid_LDOS_2diff_sg = savgolFilter_xr(grid_LDOS_2diff, window_length=61, polyorde
 # -
 
 # ### 3.1.2. Find peaks in 2nd derivative
+
+grid_LDOS_sg
+
+grid_LDOS_sg.isel(X=0).LDOS_fb.plot()
 
 grid_LDOS_2diff_sg_dps = find_peaks_xr ( - grid_LDOS_2diff_sg, distance= 10)
 grid_LDOS_2diff_sg_dps_pad = peak_pad (grid_LDOS_2diff_sg_dps)

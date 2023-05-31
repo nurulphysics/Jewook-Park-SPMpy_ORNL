@@ -600,8 +600,8 @@ def savgolFilter_xr(xrdata,window_length=7,polyorder=3):
                                             mode = 'nearest')
                     for y in range(y_axis) 
                     for x in range(x_axis)
-                ] ).reshape(x_axis,y_axis, xrdata.bias_mV.size),
-                dims = ["X", "Y", "bias_mV"],
+                ] ).reshape(y_axis,x_axis, xrdata.bias_mV.size),
+                dims = ["Y", "X", "bias_mV"],
                 coords = {"X": xrdata.X,
                           "Y": xrdata.Y,
                           "bias_mV": xrdata.bias_mV}            )
@@ -927,7 +927,7 @@ def find_peak_properties_xr(xrdata):
             xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
                 np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values)[1] 
                           for y in range(y_axis)  
-                          for x in range(x_axis)], dtype = object ).reshape(x_axis,y_axis),
+                          for x in range(x_axis)], dtype = object ).reshape(y_axis,x_axis),
                 dims=["X", "Y"],
                 coords={"X": xrdata.X, "Y": xrdata.Y})         
         elif len(xrdata[data_ch].dims) == 1:
@@ -1082,9 +1082,9 @@ def peak_mV_3Dxr(xr_data,ch='LIX_fb'):
         else: 
             xrdata_prcssd[data_ch+'_peaks_mV'] = xr.DataArray (
                 np.array([ xr_data.bias_mV.isin(xr_data.bias_mV[peaks_list[x,y]])
-                          for x in range(x_axis)  
-                          for y in range(y_axis)], dtype = object ).reshape(x_axis,y_axis,bias_mV_axis),
-                dims=["X", "Y","bias_mV"],
+                          for y in range(y_axis)  
+                          for x in range(x_axis)], dtype = object ).reshape(y_axis,x_axis,bias_mV_axis),
+                dims=["Y", "X","bias_mV"],
                 coords={"X": xr_data.X, "Y": xr_data.Y,  "bias_mV": xr_data.bias_mV}) 
     return xrdata_prcssd
 
