@@ -394,8 +394,7 @@ else:
     LIX_bwd  = Scan.signals[LIX_key[0]]['backward'][:,::-1]
 
 
-# -
-
+# +
 def img2xr (loading_sxm_file, center_offset = False):
     # updated for multipass 
     # import necessary module 
@@ -636,7 +635,15 @@ def img2xr (loading_sxm_file, center_offset = False):
             # or just leave as np.nan --> FFT calc. issue. 
             # 2D sxm summary --> fillna(0) , otherwise --> leave it as nan
         ########################################
+-----
 
+continu here
+
+
+
+
+
+----
     ############################
     # conver to DataFrame (PANDAS) 
     z_LIX_fNb_df = pd.concat([z_fwd_df.stack(),
