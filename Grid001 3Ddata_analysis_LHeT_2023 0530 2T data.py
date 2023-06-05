@@ -312,8 +312,10 @@ isns.imshow(plane_fit_surface_xr(plane_fit_y_xr(grid_topo), order=2).topography,
 #     * hv_bias_mV_slicing
 #     * hv_XY_slicing
 
-hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb',frame_width=400)#.opts(clim = (0,1.0E-11))
+hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb',frame_width=400).opts(clim = (0,1E-10))
 #hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb').opts(clim = (0,1.5E-10)) # adjust cbar limit
+
+
 
 # ####  1.5.2. Y or X slicing 
 
@@ -1392,8 +1394,8 @@ grid_LDOS
 # +
 import matplotlib.patches as patches
 
-rec_x0, rec_y0 = 5.4E-9,4E-9
-rec_width,rec_height = 0.8E-9, 12E-9
+rec_x0, rec_y0 = 5.6E-9,4.5E-9
+rec_width,rec_height = 0.8E-9, 10E-9
 
 grid_LDOS_zm = grid_LDOS.where( (grid_LDOS.X >rec_x0)&(grid_LDOS.X <rec_x0+rec_width)&(grid_LDOS.Y >rec_y0) &(grid_LDOS.Y <rec_y0+rec_height ), drop = True)
 grid_topo_zm = grid_topo.where( (grid_LDOS.X >rec_x0)&(grid_LDOS.X <rec_x0+rec_width)&(grid_LDOS.Y >rec_y0) &(grid_LDOS.Y <rec_y0+rec_height ), drop = True)
@@ -1500,11 +1502,11 @@ def savgolFilter_xr(xrdata,window_length=7,polyorder=3):
 
 
 # +
-grid_LDOS_sg = savgolFilter_xr(grid_LDOS_zm, window_length=61, polyorder=4)
+grid_LDOS_sg = savgolFilter_xr(grid_LDOS_zm, window_length=21, polyorder=5)
 grid_LDOS_1diff =  grid_LDOS_sg.differentiate('bias_mV')
-grid_LDOS_1diff_sg = savgolFilter_xr(grid_LDOS_1diff, window_length=61, polyorder=4)
+grid_LDOS_1diff_sg = savgolFilter_xr(grid_LDOS_1diff, window_length=21, polyorder=5)
 grid_LDOS_2diff =  grid_LDOS_1diff_sg.differentiate('bias_mV')
-grid_LDOS_2diff_sg = savgolFilter_xr(grid_LDOS_2diff, window_length=61, polyorder=4)
+grid_LDOS_2diff_sg = savgolFilter_xr(grid_LDOS_2diff, window_length=21, polyorder=5)
 
 
 
@@ -1530,11 +1532,27 @@ hv_XY_slicing(grid_LDOS_2diff_sg, slicing='X' , ch='LDOS_fb')#.opts(clim = (0,5E
 #hv_bias_mV_slicing(grid_LDOS_2diff_sg_dps_pad.where(grid_LDOS_2diff_sg_dps_pad.X<5E-9).where(grid_LDOS_2diff_sg_dps_pad.Y>3E-9), ch='LDOS_fb')
 # -
 
-grid_LDOS_sg_pk  = grid3D_line_avg_pks( grid_LDOS_sg,ch_l_name ='LDOS_fb', average_in= 'X',distance = 100, threshold = (1E-16)) 
+grid_LDOS_sg_pk  = grid3D_line_avg_pks( grid_LDOS_sg,ch_l_name ='LDOS_fb', average_in= 'X',distance = 20, threshold = (5E-9)) 
 #grid_LDOS_sg_pk
 
-grid_LDOS_sg_pk_slct, grid_LDOS_sg_df, grid_LDOS_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_sg_pk,ch_l_name ='LDOS_fb', plot_y_offset= 1E-11, legend_title = "X (nm)",peak_LIX_min = 1E-17)
+grid_LDOS_sg_pk_slct, grid_LDOS_sg_df, grid_LDOS_sg_pk_df, fig = grid_lineNpks_offset(grid_LDOS_sg_pk,ch_l_name ='LDOS_fb', 
+                                                                                      plot_y_offset= 2E-11,
+                                                                                      legend_title = "X (nm)",
+                                                                                      peak_LIX_min = 4E-15)
 plt.show()
+
+axs.Axes.set_ylabel('dI/dV')
+fig
+
+# +
+grid_LDOS_sg
+
+grid_LDOS_sg = savgolFilter_xr(grid_LDOS)
+# -
+
+grid_LDOS_zm = grid_LDOS_sg.where( (grid_LDOS_sg.Y<1.45E-8)&(grid_LDOS_sg.Y>0.45E-8)).where((grid_LDOS_sg.X<1.1E-8)&(grid_LDOS_sg.X>0.1E-8))
+
+isns.imshow(grid_LDOS_zm.LDOS_fb.sel(bias_mV =0, method = 'nearest'), robust = True, cmap = 'bwr')
 
 # #  save npy for tomviz 
 
