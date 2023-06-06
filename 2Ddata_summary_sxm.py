@@ -283,48 +283,147 @@ prs.save(pptx_file_name)
 from pptx.util import Inches
 from pptx.util import Cm, Pt
 
-for files_name in files_df.file_name:
+for files_name in files_df[files_df.type ==  'sxm'].file_name:
     spmdata_xr = img2xr(files_name)
 
     # open previously prepared pptx 
     prs = Presentation(pptx_file_name)
 
+    if spmdata_xr.multipass == True :
+        # split spmdata_xr as  spmdata_P1_xr & spmdata_P2_xr
+        # 
+        spmdata_P1_xr = spmdata_xr.drop(['Z_P2fwd', 'Z_P2bwd','LIX_P2fwd', 'LIX_P2bwd'])
+        spmdata_P2_xr = spmdata_xr.drop(['Z_P1fwd', 'Z_P1bwd','LIX_P1fwd', 'LIX_P1bwd'])
 
-    img_sld_slide_layout = prs.slide_layouts[6] # image slide (layout_type =  [6] )
-    img_sld = prs.slides.add_slide(img_sld_slide_layout)
-    # textbox setting
-    left_textbox = Inches(0)
-    top_textbox = Inches(0)
-    width_textbox = Inches(4)
-    height_textbox = Inches(1)
-    txBox  = img_sld.shapes.add_textbox(left_textbox, top_textbox,width_textbox,height_textbox )
+        # rename channel names after split dual XR 
+
+        spmdata_P1_xr = spmdata_P1_xr.rename ({'Z_P1fwd': 'Z_fwd', 'Z_P1bwd': 'Z_bwd', 'LIX_P1fwd': 'LIX_fwd', 'LIX_P1bwd': 'LIX_bwd'})
+        spmdata_P2_xr = spmdata_P2_xr.rename ({'Z_P2fwd': 'Z_fwd', 'Z_P2bwd': 'Z_bwd', 'LIX_P2fwd': 'LIX_fwd', 'LIX_P2bwd': 'LIX_bwd'})
+        
+        # set P1 P2 title
+        
+        spmdata_P1_xr.attrs['title'] =  spmdata_P1_xr.title.split('//')[0]
+        spmdata_P2_xr.attrs['title'] = spmdata_P2_xr.title.split('Pass1')[0]+spmdata_P2_xr.title.split('//')[-1]
+        
+        
+        ###########################
+        # P1 page setting 
+        
+        img_sld_slide_layout = prs.slide_layouts[6] # image slide (layout_type =  [6] )
+        img_sld = prs.slides.add_slide(img_sld_slide_layout)
+        # textbox setting
+        left_textbox = Inches(0)
+        top_textbox = Inches(0)
+        width_textbox = Inches(4)
+        height_textbox = Inches(1)
+        txBox  = img_sld.shapes.add_textbox(left_textbox, top_textbox,width_textbox,height_textbox )
+
+        tx_frame = txBox.text_frame 
+        tx_frame.text =  spmdata_xr.title
+
+        # real space figure 
+        left = Inches(0)
+        top = Inches(1)
+
+        spm_data_plot = xr_isns_plot_r_space(plane_fit_x_xr(plane_fit_y_xr(spmdata_P1_xr)),
+                                             figsize= (5,6))
+        spm_data_plot.savefig('spm_data_plot_temp1.png', 
+                              bbox_inches='tight', dpi = 300)
+
+        r_space_img = img_sld.shapes.add_picture('spm_data_plot_temp1.png', 
+                                               left, 
+                                               top)
+        # momentum space figure
+        spm_data_fft_plot = xr_isns_plot_k_space(twoD_FFT_xr( plane_fit_x_xr(plane_fit_y_xr(spmdata_P1_xr))), 
+                                                 figsize= (5,6),
+                                                 zoom_in_fft= False, zoom_in_expand= False)
+
+        spm_data_fft_plot.savefig('spm_data_fft_plot_temp1.png',bbox_inches='tight', dpi = 300)
+        left_2 = Inches(5)
+
+        k_space_img = img_sld.shapes.add_picture('spm_data_fft_plot_temp1.png',
+                                               left_2,
+                                               top)
     
-    tx_frame = txBox.text_frame 
-    tx_frame.text =  spmdata_xr.title
     
-    # real space figure 
-    left = Inches(0)
-    top = Inches(1)
+        ###################################
+        ### P2 page setting 
+        
+        img_sld_slide_layout = prs.slide_layouts[6] # image slide (layout_type =  [6] )
+        img_sld = prs.slides.add_slide(img_sld_slide_layout)
+        # textbox setting
+        left_textbox = Inches(0)
+        top_textbox = Inches(0)
+        width_textbox = Inches(4)
+        height_textbox = Inches(1)
+        txBox  = img_sld.shapes.add_textbox(left_textbox, top_textbox,width_textbox,height_textbox )
 
-    spm_data_plot = xr_isns_plot_r_space(plane_fit_x_xr(plane_fit_y_xr(spmdata_xr)),
-                                         figsize= (5,6))
-    spm_data_plot.savefig('spm_data_plot_temp.png', 
-                          bbox_inches='tight', dpi = 300)
+        tx_frame = txBox.text_frame 
+        tx_frame.text =  spmdata_xr.title
 
-    r_space_img = img_sld.shapes.add_picture('spm_data_plot_temp.png', 
-                                           left, 
-                                           top)
-    # momentum space figure
-    spm_data_fft_plot = xr_isns_plot_k_space(twoD_FFT_xr( plane_fit_x_xr(plane_fit_y_xr(spmdata_xr))), 
-                                             figsize= (5,6),
-                                             zoom_in_fft= False, zoom_in_expand= False)
+        # real space figure 
+        left = Inches(0)
+        top = Inches(1)
 
-    spm_data_fft_plot.savefig('spm_data_fft_plot_temp.png',bbox_inches='tight', dpi = 300)
-    left_2 = Inches(5)
+        spm_data_plot = xr_isns_plot_r_space(plane_fit_x_xr(plane_fit_y_xr(spmdata_P2_xr)),
+                                             figsize= (5,6))
+        spm_data_plot.savefig('spm_data_plot_temp2.png', 
+                              bbox_inches='tight', dpi = 300)
 
-    k_space_img = img_sld.shapes.add_picture('spm_data_fft_plot_temp.png',
-                                           left_2,
-                                           top)
+        r_space_img = img_sld.shapes.add_picture('spm_data_plot_temp2.png', 
+                                               left, 
+                                               top)
+        # momentum space figure
+        spm_data_fft_plot = xr_isns_plot_k_space(twoD_FFT_xr( plane_fit_x_xr(plane_fit_y_xr(spmdata_P2_xr))), 
+                                                 figsize= (5,6),
+                                                 zoom_in_fft= False, zoom_in_expand= False)
+
+        spm_data_fft_plot.savefig('spm_data_fft_plot_temp2.png',bbox_inches='tight', dpi = 300)
+        left_2 = Inches(5)
+
+        k_space_img = img_sld.shapes.add_picture('spm_data_fft_plot_temp2.png',
+                                               left_2,
+                                               top)
+    
+        
+    
+    else : 
+
+        img_sld_slide_layout = prs.slide_layouts[6] # image slide (layout_type =  [6] )
+        img_sld = prs.slides.add_slide(img_sld_slide_layout)
+        # textbox setting
+        left_textbox = Inches(0)
+        top_textbox = Inches(0)
+        width_textbox = Inches(4)
+        height_textbox = Inches(1)
+        txBox  = img_sld.shapes.add_textbox(left_textbox, top_textbox,width_textbox,height_textbox )
+
+        tx_frame = txBox.text_frame 
+        tx_frame.text =  spmdata_xr.title
+
+        # real space figure 
+        left = Inches(0)
+        top = Inches(1)
+
+        spm_data_plot = xr_isns_plot_r_space(plane_fit_x_xr(plane_fit_y_xr(spmdata_xr)),
+                                             figsize= (5,6))
+        spm_data_plot.savefig('spm_data_plot_temp.png', 
+                              bbox_inches='tight', dpi = 300)
+
+        r_space_img = img_sld.shapes.add_picture('spm_data_plot_temp.png', 
+                                               left, 
+                                               top)
+        # momentum space figure
+        spm_data_fft_plot = xr_isns_plot_k_space(twoD_FFT_xr( plane_fit_x_xr(plane_fit_y_xr(spmdata_xr))), 
+                                                 figsize= (5,6),
+                                                 zoom_in_fft= False, zoom_in_expand= False)
+
+        spm_data_fft_plot.savefig('spm_data_fft_plot_temp.png',bbox_inches='tight', dpi = 300)
+        left_2 = Inches(5)
+
+        k_space_img = img_sld.shapes.add_picture('spm_data_fft_plot_temp.png',
+                                               left_2,
+                                               top)
     prs.save(pptx_file_name)  
 
 
@@ -332,7 +431,8 @@ for files_name in files_df.file_name:
 # -
 
 
-nap
+files_df
+
 
 
 

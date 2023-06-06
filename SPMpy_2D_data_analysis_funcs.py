@@ -2693,6 +2693,8 @@ def xr_isns_plot_r_space(xrdata,
         print(isns_channels)
         if 'z_' in  i_channels:
             cmap =  'copper'
+        elif 'Z_' in  i_channels:
+            cmap =  'copper'
         elif 'LIX_' in  i_channels:
             cmap = 'bwr'
         isns_channels = isns.imshow(xrdata[i_channels],
@@ -2786,6 +2788,8 @@ def xr_isns_plot_k_space(xrdata_fft,
     # triming first with respect to # of data channel 
     for i,i_channels in enumerate(xrdata_fft):
         if 'z_' in i_channels:
+            cmap = 'Greys'
+        elif 'Z_' in i_channels:
             cmap = 'Greys'
         elif 'LIX_' in i_channels:
             cmap = 'Blues'
