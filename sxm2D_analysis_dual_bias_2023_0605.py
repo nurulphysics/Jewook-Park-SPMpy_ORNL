@@ -1631,3 +1631,16 @@ def xrdata_fft_rot_angle(xrdata_fft):
 xr_isns_plot_r_space(dual_xr_P1)
 
 
+
+# ## 2.3 Numerical derivative 
+#     * Derivative + SG smoothing
+#
+# ### 2.3.1. SG + 1stderiv + SG + 2nd deriv + SG
+
+# +
+
+grid_LDOS_rot_sg_1deriv = grid_LDOS_rot_sg.differentiate('bias_mV')
+grid_LDOS_rot_sg_1deriv_sg = savgolFilter_xr(grid_LDOS_rot_sg_1deriv, window_length = 51, polyorder = 5)
+grid_LDOS_rot_sg_2deriv = grid_LDOS_rot_sg_1deriv_sg.differentiate('bias_mV')
+grid_LDOS_rot_sg_2deriv_sg =  savgolFilter_xr(grid_LDOS_rot_sg_2deriv, window_length = 51, polyorder = 5)
+grid_LDOS_rot_sg_2deriv_sg
