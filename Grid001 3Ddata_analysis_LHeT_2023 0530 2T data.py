@@ -148,6 +148,16 @@ except ModuleNotFoundError:
     import hvplot.xarray
     import hvplot.pandas 
 
+    
+try:
+    import plotly.express as px
+except ModuleNotFoundError:
+    warn('ModuleNotFoundError: No module named plotly')
+    # !pip install plotly
+    import plotly.express as px
+
+    
+    
 
 
 try:
@@ -270,11 +280,7 @@ grid_LDOS
 
 # ### 1.4 Topography view 
 
-# +
 grid_topo = grid_topo.drop(['gap_map_I'])#.isnull().sum()
-
-
-# -
 
 
 sns.lineplot(x  ='X', y = 'topography', data = plane_fit_surface_xr(plane_fit_y_xr(grid_topo), order=2).topography.to_dataframe())
@@ -316,6 +322,7 @@ plt.show()
 # ### 2.3.1. SG + 1stderiv + SG + 2nd deriv + SG
 
 grid_LDOS_sg = savgolFilter_xr(grid_LDOS, window_length = 51, polyorder = 3)
+
 grid_LDOS_1deriv = grid_LDOS_sg.differentiate('bias_mV')
 grid_LDOS_1deriv_sg = savgolFilter_xr(grid_LDOS_1deriv, window_length = 51, polyorder = 3)
 grid_LDOS_2deriv = grid_LDOS_1deriv_sg.differentiate('bias_mV')
@@ -327,37 +334,297 @@ grid_LDOS_2deriv_sg.isel(X=1).LDOS_fb.plot()
 grid_LDOS_sg_pk  = grid3D_line_avg_pks( grid_LDOS_sg ,ch_l_name ='LDOS_fb', average_in= 'Y',distance =40, height = 2E-11) 
 grid_LDOS_sg_pk  
 
-grid_LDOS_sg_pk = find_peaks_xr(grid_LDOS_sg)
+grid_LDOS_sg_pk = find_peaks_xr(grid_LDOS_sg, prominence  = 1E-13)
 grid_LDOS_sg_pk
 
 
-grid_LDOS_sg_pk_pad = peak_pad (grid_LDOS_sg_pk)
+grid_LDOS_sg_pk_pad = peak_pad(grid_LDOS_sg_pk, padding_value=0)
 grid_LDOS_sg_pk_pad
 
+grid_LDOS_sg_pk_pad_prominence = find_peaks_properties_xr(grid_LDOS_sg_pk_pad)
 
-def find_peaks_properties_xr(xrdata, height= None, threshold=None, distance=None): 
+# +
+##############
+# how to extrct prominence part 
+
+#grid_LDOS_sg_pk_pad_prominence
+#grid_LDOS_sg_pk_pad_prominence.LDOS_fb_peak_prominence.isel(prominence = 0)
+#grid_LDOS_sg_pk_pad_prominence.LDOS_fb_peak_prominence.sel(prominence = 'prominences').drop('prominence')
+
+
+##################################
+
+# how to extract peak position part 
+#grid_LDOS_sg_pk_pad_prominence.LDOS_fb_peaks_pad.isel(Y=0)
+
+
+# +
+#import plotly.express as px
+# maybe... layter plotly 
+
+
+#################################
+####  extract peak & prominence 
+#################################
+xr_peaks =grid_LDOS_sg_pk_pad_prominence.LDOS_fb_peaks_pad.isel(Y=0)
+xr_promi = grid_LDOS_sg_pk_pad_prominence.LDOS_fb_peak_prominence.sel(prominence = 'prominences').drop('prominence')
+
+##############################
+# convert to dataframe test
+##############################
+#
+# xr_peaks.to_dataframe().drop(columns = ['Y'])
+#  xr_promi.to_dataframe()
+# make a same shaped dataframe 
+
+#########################################
+# Make DATA FRAME FOR PLOT in 2D 
+xr_df = pd.concat ([xr_peaks.to_dataframe().drop(columns = ['Y']),  xr_promi.to_dataframe()], axis =1)
+#########################
+# remove  zeros....  
+# instead of using padding value  = np.nan use  "0" to match the integer condition 
+xr_df_nonzero = xr_df[xr_df.LDOS_fb_peaks_pad != 0]
+###############
+# -
+
+xr_promi
+
+# +
+##############################
+# reshaping the data set 
+##############################
+#xr_df_nonzero.reset_index()
+#############################
+# after reset_index, make a pivot table. only peak points are show. 
+
+xr_df_nonzero_reshape = xr_df_nonzero.reset_index().pivot(index = 'X', columns = 'LDOS_fb_peaks_pad', values = 'LDOS_fb_peak_prominence')
+
+############################
+## plot in 2D 
+###########################
+
+isns.imshow (xr_df_nonzero_reshape)
+
+
+# peak axis is not correct.  data points  < original frame 
+# -
+
+xr_df_nonzero_reshape
+
+xr_df_nonzero_reshape.plot.scatter()
+#xr_df_nonzero_reshape.plot.scatter(x = 'X', y  = 'LDOS_fb_peaks_pad')
+
+sns.scatterplot(x =  'X', Y = 'LDOS_fb_peak_prominence', data = xr_df_nonzero_reshape)
+
+xr_peaks =grid_LDOS_sg_pk_pad_prominence.LDOS_fb_peaks_pad.isel(Y=0).drop('Y')
+xr_promi = grid_LDOS_sg_pk_pad_prominence.LDOS_fb_peak_prominence.sel(prominence = 'prominences').drop('prominence')
+
+
+xr_peakNprom.LDOS_fb_peak_prominence.shape
+
+
+xr_peaks.to_dataset().LDOS_fb_peaks_pad.shape
+
+xr_peakNprom = xr_promi.to_dataset()
+xr_peakNprom[['peaks']] = xr_peaks
+xr_peakNprom
+#xr.Dataset({xr_peaks,xr_promi})
+
+xr_peaks = xr.DataArray( xr_df, 
+                      dims = ['X', 'bias_mV', 'peaks'], 
+                      coords = {'X':grid_LDOS_sg_pk_pad_prominence.X, 'bias_mV': grid_LDOS_sg_pk_pad_prominence.bias_mV, 'peak' : grid_LDOS_sg_pk_pad_prominence.peaks })
+
+xr_df.unstack()
+
+xr_pk_prom = xr.Dataset ({"peak" :xr_peaks , "prom": xr_promi})
+xr_pk_prom_df = xr_pk_prom.to_dataframe().melt(id_vars= ['peak','prom'],  value_name = 'X')
+
+
+sns.scatterplot (x= 'X', y= 'prom',hue = 'peak', df = xr_pk_prom_df)
+
+grid_LDOS_sg_pk_pad = peak_pad (grid_LDOS_sg_pk, padding_value= 0)
+grid_LDOS_sg_pk_pad
+
+from scipy.signal import find_peaks, peak_prominences
+test_prom = np.array (
+    [peak_prominences(grid_LDOS_sg_pk['LDOS_fb'].isel(X = 1).values[0,:], grid_LDOS_sg_pk_pad['LDOS_fb_peaks_pad'].isel(X = 1).values[0,:])
+     for x in range (50)], dtype =object)
+
+test_prom.shape
+
+
+def find_peaks_properties_xr(xrdata, find_peaks_in_ch = 'LDOS_fb', height= None, threshold=None, distance=None): 
+    from scipy.signal import find_peaks, peak_prominences
+    
+    xrdata_prcssd = xrdata.copy(deep = True)
+    
+    print('Use this function only after find_peaks_xr  & peak_pad')
+    # counting irregular number of dimension issue 
+    # each pixel will have different pixel number 
+    # use peak_pad for peak # as a dimension 
+    print (' use padding_value= 0, & remove peaks at index zero' ) 
+    # peak_pad filling --> 0 
+    
+    
+    for ch_i, data_ch in enumerate(xrdata):
+
+        if data_ch == find_peaks_in_ch:
+            print (data_ch + 'dims = '+ str(len(xrdata[data_ch].dims)))
+            # channel dim is not good variable to assign grid_line or grid_map
+            
+            if len(xrdata[data_ch].dims) == 1:
+                if data_ch == find_peaks_in_ch : 
+                    print (data_ch+ ' peak_properties check for dim ==1')
+                    if 'bias_mV' in xrdata.dims: 
+                        for data_ch in xrdata: 
+                            xrdata_prcssd[data_ch+'_peaks_pad'] = xr.DataArray (peak_prominences(xrdata[data_ch].values[0,:], xrdata[data_ch+'_peaks_pad'].values[0,:])[0])
+                    else : pass
+                else: pass
+
+    
+            elif ( len(grid_LDOS_sg_pk.X) == 1 ) or (len(grid_LDOS_sg_pk.Y) == 1 ) :
+                print (data_ch+ ' peak_properties check for dim ==2')
+                # smoothing filter only for the 3D data set# ==> updated             
+                ### 2D data case 
+                ### assume that coords are 'X','Y','bias_mV'
+                #### two case X,bias_mV or Y,bias_mV 
+                if 'X' in xrdata[data_ch].dims :
+                    # xrdata is X,bias_mV 
+                    # use the isel(X = x) 
+                    x_axis = xrdata.X.size
+                    print('Along X')
+                    #print(xrdata_prcssd[data_ch])
+
+                    xrdata_prcssd[data_ch+'_peak_prominence'] = xr.DataArray (
+                        np.array([ peak_prominences(xrdata[data_ch].isel(X = x).values[0,:], xrdata[data_ch+'_peaks_pad'].isel(X = x).values[0,:])
+                                  for x in range(x_axis)], dtype = float ),
+                    dims=["X", "prominence", "peaks"],
+                    coords={"X": xrdata.X, "peaks": xrdata.peaks, "prominence":['prominences', 'left_bases','right_basis']})
+
+                elif 'Y' in xrdata[data_ch].dims :
+                    # xrdata is Y,bias_mV 
+                    # use the isel(Y = y) 
+                    y_axis = xrdata.Y.size
+                    print('Along Y')
+                    #print(xrdata_prcssd[data_ch])
+
+                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
+                        np.array([peak_prominences(xrdata[data_ch].isel(Y = y).values[0,:], xrdata[data_ch+'_peaks_pad'].isel(Y = y).values[0,:])
+                                  for y in range(y_axis)], dtype = float ),
+                    dims=["Y", "prominence", "peaks"],
+                    coords={"Y": xrdata.Y, "peaks": xrdata.peaks, "prominence":['prominences', 'left_bases','right_basis']})
+                else: 
+                     print (data_ch + ': channel is not for prominence finding dim==2')
+                    # ==> updated 
+
+            elif ( len(grid_LDOS_sg_pk.X) != 1 ) & (len(grid_LDOS_sg_pk.Y) != 1 ) :
+                if data_ch == find_peaks_in_ch : 
+
+                    print('dim ==3')
+                    x_axis = xrdata.X.size
+                    y_axis = xrdata.Y.size
+                    print (ch_i,data_ch)
+                    print ('prominence checking')
+                    xrdata_prcssd[data_ch+'_peaks_prominience'] = xr.DataArray (
+                        np.array([ peak_prominences(xrdata[data_ch].isel(X = x, Y = y).values[0,:], xrdata[data_ch+'_peaks_pad'].isel(X = x, Y = y).values[0,:])[0]
+                                  for y in range(y_axis)  
+                                  for x in range(x_axis)], dtype = float ).reshape(x_axis,y_axis),
+                        dims=["X", "Y","peaks","prominence" ],
+                        coords={"X": xrdata.X, "Y": xrdata.Y, "peaks": xrdata.peaks, "prominence":['prominences', 'left_bases','right_basis']})
+
+                    ### there is something wrong here...
+                    ###  check the find peak functions again ..
+                else:                     
+                    print (data_ch + str(ch_i)+ ': channel is not for prominence finding, dim ==3')
+                    print('_peak_prominence_skip')
+                    #xrdata_prcssd[data_ch] = xrdata[data_ch]
+                    print (data_ch, ch_i)
+                    print (data_ch+ ' peak_properties check not for this c hannel , for dim ==3')
+            else: pass
+    
+                                            
+        else : pass
+        
+    return xrdata_prcssd
+#grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
+
+grid_LDOS_sg_pk_pad_promin =find_peaks_properties_xr (grid_LDOS_sg_pk_pad) 
+
+grid_LDOS_sg_pk_pad_promin
+
+xrdata_prcssd_prminence.LDOS_fb_peak_prominence
+
+# +
+#grid_LDOS_sg_pk_pad_prop = find_peaks_properties_xr (grid_LDOS_sg_pk_pad)
+xrdata_prcssd_prminence  = find_peaks_properties_xr(grid_LDOS_sg_pk_pad)
+
+#xrdata_prcssd_prminence
+
+# + jupyter={"source_hidden": true}
+xrdata_prcssd_prminence
+# -
+
+
+
+test_peak = grid_LDOS_sg_pk_pad['LDOS_fb_peaks_pad'].where(~grid_LDOS_sg_pk_pad['LDOS_fb_peaks_pad'].isin(0)).isel(X=1).values[0].tolist()
+int(test_peak)
+#.dropna(dim = 'peaks')
+
+peak_prominences(grid_LDOS_sg_pk_pad['LDOS_fb'].isel(X = 1).values[0,:], test_peak)
+
+np.array (
+    [peak_prominences(grid_LDOS_sg_pk_pad['LDOS_fb'].isel(X = x).values[0,:], grid_LDOS_sg_pk_pad['LDOS_fb_peaks_pad'].values.tolist()[x][0])
+     for x in range (50)], dtype =object)
+
+grid_LDOS_sg_pk_pad
+
+xr.DataArray(np.array ([peak_prominences(grid_LDOS_sg_pk['LDOS_fb'].isel(X = x).values[0,:], grid_LDOS_sg_pk['LDOS_fb_peaks'].values.tolist()[x][0])
+     for x in range (50)], dtype =object), dims = ["X", "prominence"], coords = {"X": grid_LDOS_sg_pk.X, "prominence": np.arange(3)})
+#np.array([peak_prominences(grid_LDOS_sg_pk['LDOS_fb'].isel(X = x).values, grid_LDOS_sg_pk['LDOS_fb_peaks'].values.tolist()[x][0])[0]  for x in range (50)], dtype =object).shape
+
+np.arange(3)
+
+xr.DataArray ( np.array([peak_prominences(grid_LDOS_sg_pk['LDOS_fb'].isel(X = x, Y = y).values, grid_LDOS_sg_pk['LDOS_fb_peaks'].values.tolist()[x][y])
+               for y  in range (1) for x in range (50)], dtype =object), dims = [])
+
+grid_LDOS_sg_pk.X
+
+ xr.DataArray ( 
+     np.array([peak_prominences(grid_LDOS_sg_pk['LDOS_fb'].isel(X = x, Y = y).values, grid_LDOS_sg_pk['LDOS_fb_peaks'].values.tolist()[x][y])[0] 
+               for y  in range (1) for x in range (50)], dtype =object),
+     dims=["X"],
+     coords={"X": grid_LDOS_sg_pk.X})
+
+( len(grid_LDOS_sg_pk.X) == 1 ) or (len(grid_LDOS_sg_pk.Y) == 1 ) 
+
+
+def find_peaks_properties_xr(xrdata, find_peaks_in_ch = ['LDOS_fb'], height= None, threshold=None, distance=None): 
     from scipy.signal import find_peaks, peak_prominences
     xrdata_prcssd = xrdata.copy(deep = True)
     print('Use the find_peaks_xr first to find peaks in STS to an xarray Dataset.')
     
-    for data_ch in xrdata:
-
+    for ch_i, data_ch in enumerate(xrdata):
+        print (data_ch, ch_i)
+        print ('dims = '+ str(len(xrdata[data_ch].dims)))
+        print ('start')
+        if 
+        
+        
+        
+        
+        
         if len(xrdata[data_ch].dims) == 1:
-            if '_peaks' in data_ch : pass #print (data_ch)
-            else: 
-                print (data_ch+ ' peak_properties check')
-
-                print('dim ==1')
+            if data_ch == find_peaks_in_ch : 
+                print (data_ch+ ' peak_properties check for dim ==1')
                 if 'bias_mV' in xrdata.dims: 
                     for data_ch in xrdata: 
-                        xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch], height =height, distance = distance,threshold = threshold))
+                        xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (peak_prominences(xrdata[data_ch].values, xrdata[data_ch+'_peaks'].values.tolist())[0])
                 else : pass
-
-
+            else: pass
+        
         elif len(xrdata[data_ch].dims) == 2:
-            if '_peaks' in data_ch : pass #print (data_ch)
-            else: 
-                print('dim ==2')
+            if data_ch == find_peaks_in_ch : 
+                print (data_ch+ ' peak_properties check for dim ==2')
                 # smoothing filter only for the 3D data set
                         # ==> updated             
 
@@ -373,7 +640,7 @@ def find_peaks_properties_xr(xrdata, height= None, threshold=None, distance=None
                     #print(xrdata_prcssd[data_ch])
 
                     xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([ peak_prominences(xrdata[data_ch].isel(X = x).values, xrdata[data_ch+'_peaks'].isel(X = x).values.tolist())[0]
+                        np.array([ peak_prominences(xrdata[data_ch].isel(X = x).values, xrdata[data_ch+'_peaks'].values.tolist()[x])[0]
                                   for x in range(x_axis)], dtype = object )[:,0],
                     dims=["X"],
                     coords={"X": xrdata.X})
@@ -386,98 +653,43 @@ def find_peaks_properties_xr(xrdata, height= None, threshold=None, distance=None
                     #print(xrdata_prcssd[data_ch])
 
                     xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([peak_prominences(xrdata[data_ch].isel(Y = y).values, xrdata[data_ch+'_peaks'].isel(Y = y).values.tolist())[0]
+                        np.array([peak_prominences(xrdata[data_ch].isel( Y = y).values, xrdata[data_ch+'_peaks'].values.tolist()[y])[0]
                                   for y in range(y_axis)], dtype = object )[:,0],
                     dims=["Y"],
                     coords={"Y": xrdata.Y})
-
-                # ==> updated 
-
-
-                """
-                ### 2D data case 
-                ### assume that coords are 'X','Y','bias_mV'
-                #### two case X,bias_mV or Y,bias_mV 
-                if 'X' in xrdata[data_ch].dims :
-                    # xrdata is X,bias_mV 
-                    # use the isel(X = x) 
-                    x_axis = xrdata.X.size
-
-                    #print(xrdata_prcssd[data_ch])
-
-                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([ find_peaks(xrdata[data_ch].isel(X = x).values, height =height, distance = distance, threshold = threshold)
-                                  for x in range(x_axis)], dtype = object )[:,1],
-                    dims=["X"],
-                    coords={"X": xrdata.X})
-
-                elif 'Y' in xrdata[data_ch].dims :
-                    # xrdata is Y,bias_mV 
-                    # use the isel(Y = y) 
-                    y_axis = xrdata.Y.size
-
-                    #print(xrdata_prcssd[data_ch])
-
-                    '''xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values, height =height, distance = distance,threshold = threshold)
-                                  for y in range(y_axis)], dtype = object )[:,1],
-                    dims=["Y"],
-                    coords={"Y": xrdata.Y})'''
-                    xrdata_prcssd[data_ch+'_peaks_prominences'] =  xr.DataArray (
-
-
-                        , grid_LDOS_sg_pk.[data_ch+'_peaks'].isel(X=1).values.tolist() )[0]
-                        ###################
-                        #peaks, _ = find_peaks(x)
-                        #prominences = peak_prominences(x, peaks)[0]
-                        ##################
-
-                        np.array([ peak_prominences( find_peaks(xrdata[data_ch].isel(Y = y).values, xrdata.[data_ch+'_peaks']), 
-
-                                  find_peaks(xrdata[data_ch].isel(Y = y).values, height =height, distance = distance,threshold = threshold)
-                                  for y in range(y_axis)], dtype = object )[:,1],
-                    dims=["Y"],
-                    coords={"Y": xrdata.Y})
-
-
-                # ==> updated 
-                """            
-        elif len(xrdata[data_ch].dims) == 3:
-            if '_peaks' in data_ch : pass #print (data_ch)
             else: 
+                 print (data_ch + ': channel is not for prominence finding dim==2')
+                # ==> updated 
+
+        elif len(xrdata[data_ch].dims) == 3:
+            if data_ch == find_peaks_in_ch : 
+                
                 print('dim ==3')
                 x_axis = xrdata.X.size
                 y_axis = xrdata.Y.size
-                print (data_ch)
-                """xrdata_prcssd[data_ch+'_peaks']= xr.DataArray(np.ones((xAxis,yAxis), dtype = object),
-                                                                 dims=["X", "Y"],
-                                                                 coords={"X": xrdata.X, "Y": xrdata.Y} )"""
+                print (ch_i,data_ch)
+                print ('prominence checking')
                 xrdata_prcssd[data_ch+'_peaks_prominience'] = xr.DataArray (
-                    np.array([ peak_prominences(xrdata[data_ch].isel(X = x, Y = y).values, xrdata[data_ch+'_peaks'].isel(X = x, Y = y).values.tolist())[0]
+                    np.array([ peak_prominences(xrdata[data_ch].isel(X = x, Y = y).values, xrdata[data_ch+'_peaks'].values.tolist()[x][y])[0]
                               for y in range(y_axis)  
                               for x in range(x_axis)], dtype = object ).reshape(x_axis,y_axis),
                     dims=["X", "Y"],
                     coords={"X": xrdata.X, "Y": xrdata.Y})
                 
-                
-                
                 ### there is something wrong here...
                 ###  check the find peak functions again ..
-                
-                
-                print('_peak_prominence')
-        else : print ('done ')
-
-
+            else:                     
+                print (data_ch + str(ch_i)+ ': channel is not for prominence finding, dim ==3')
+                print('_peak_prominence_skip')
+                #xrdata_prcssd[data_ch] = xrdata[data_ch]
+                print (data_ch, ch_i)
+                print (data_ch+ ' peak_properties check not for this c hannel , for dim ==3')
+        else: pass
+        
+        print ('channel checked.')
+        
     return xrdata_prcssd
 #grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
-
-# +
-#grid_LDOS_sg_pk_pad_prop = find_peaks_properties_xr (grid_LDOS_sg_pk_pad)
-find_peaks_properties_xr(grid_LDOS_sg_pk)
-
-#grid_LDOS_sg_pk_pad_prop
-# -
 
 grid_LDOS_sg_pk_pad_prop
 
@@ -1579,7 +1791,7 @@ def grid3D_line_avg_pks (xr_data, average_in =  'X',
 #grid_3D_test_l_pk = grid3D_line_avg_pks(grid_3D, average_in= 'Y')
 #grid_3D_test_l_pk
 
-#grid_LDOS_rot_sg_2deriv_sg_dks.LDOS_fb.isel(X=x_i,Y=y_j)
+# grid_LDOS_rot_sg_2deriv_sg_dks.LDOS_fb.isel(X=x_i,Y=y_j)
 
 
 grid_LDOS_rot

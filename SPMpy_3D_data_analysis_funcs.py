@@ -808,7 +808,7 @@ def find_plateau_tolarence_values (xr_data,  x_i ,     y_j , tolerance_I= 1E-10,
 
 
 # -
-def find_peaks_xr(xrdata, height= None, threshold=None, distance=None): 
+def find_peaks_xr(xrdata, height= None, threshold=None, distance=None, prominence = None, width=None): 
     from scipy.signal import find_peaks
     xrdata_prcssd = xrdata.copy(deep = True)
     print('Find peaks in STS to an xarray Dataset.')
@@ -831,7 +831,7 @@ def find_peaks_xr(xrdata, height= None, threshold=None, distance=None):
                 #print(xrdata_prcssd[data_ch])
 
                 xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                    np.array([ find_peaks(xrdata[data_ch].isel(X = x).values, height =height, distance = distance, threshold = threshold)
+                    np.array([ find_peaks(xrdata[data_ch].isel(X = x).values, height =height, distance = distance, threshold = threshold, prominence= prominence, width =width)
                               for x in range(x_axis)], dtype = object )[:,0],
                 dims=["X"],
                 coords={"X": xrdata.X})
@@ -844,7 +844,7 @@ def find_peaks_xr(xrdata, height= None, threshold=None, distance=None):
                 #print(xrdata_prcssd[data_ch])
 
                 xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                    np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values, height =height, distance = distance,threshold = threshold)
+                    np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values, height =height, distance = distance,threshold = threshold, prominence=prominence, width=width)
                               for y in range(y_axis)], dtype = object )[:,0],
                 dims=["Y"],
                 coords={"Y": xrdata.Y})
@@ -857,7 +857,7 @@ def find_peaks_xr(xrdata, height= None, threshold=None, distance=None):
             y_axis = xrdata.Y.size
             print (data_ch)
             xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values, height =height, distance = distance,threshold = threshold)[0] 
+                np.array([ find_peaks(xrdata[data_ch].isel(X = x, Y = y).values, height =height, distance = distance,threshold = threshold,prominence=prominence, width=width)[0] 
                           for y in range(y_axis)  
                           for x in range(x_axis)], dtype = object ).reshape(x_axis,y_axis),
                 dims=["X", "Y"],
@@ -865,132 +865,13 @@ def find_peaks_xr(xrdata, height= None, threshold=None, distance=None):
         elif len(xrdata[data_ch].dims) == 1:
             if 'bias_mV' in xrdata.dims: 
                 for data_ch in xrdata: 
-                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch], height =height, distance = distance,threshold = threshold))
+                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch], height =height, distance = distance,threshold = threshold, prominence= prominence, width= width))
         else : pass
     return xrdata_prcssd
 #grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
 
-def find_peaks_properties_xr(xrdata, height= None, threshold=None, distance=None): 
-    from scipy.signal import find_peaks, peak_prominences
-    xrdata_prcssd = xrdata.copy(deep = True)
-    print('Use the find_peaks_xr first to find peaks in STS to an xarray Dataset.')
-    
-    for data_ch in xrdata:
-        if '_peaks' in data_ch : 
-            print (data_ch)
-        else: 
-            print (data_ch+ 'peak_properties check')
-            if len(xrdata[data_ch].dims)==2:
-                print('dim ==2')
-                # smoothing filter only for the 3D data set
-                        # ==> updated             
-
-
-                ### 2D data case 
-                ### assume that coords are 'X','Y','bias_mV'
-                #### two case X,bias_mV or Y,bias_mV 
-                if 'X' in xrdata[data_ch].dims :
-                    # xrdata is X,bias_mV 
-                    # use the isel(X = x) 
-                    x_axis = xrdata.X.size
-                    print('Along X')
-                    #print(xrdata_prcssd[data_ch])
-
-                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([ peak_prominences(xrdata[data_ch].isel(X = x).values, xrdata[data_ch+'_peaks'].isel(X = x).values.tolist())[0]
-                                  for x in range(x_axis)], dtype = object )[0],
-                    dims=["X"],
-                    coords={"X": xrdata.X})
-
-                elif 'Y' in xrdata[data_ch].dims :
-                    # xrdata is Y,bias_mV 
-                    # use the isel(Y = y) 
-                    y_axis = xrdata.Y.size
-                    print('Along Y')
-                    #print(xrdata_prcssd[data_ch])
-
-                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([peak_prominences(xrdata[data_ch].isel(Y = y).values, xrdata[data_ch+'_peaks'].isel(Y = y).values.tolist())[0]
-                                  for y in range(y_axis)], dtype = object )[0],
-                    dims=["Y"],
-                    coords={"Y": xrdata.Y})
-
-                # ==> updated 
-
-
-                """
-                ### 2D data case 
-                ### assume that coords are 'X','Y','bias_mV'
-                #### two case X,bias_mV or Y,bias_mV 
-                if 'X' in xrdata[data_ch].dims :
-                    # xrdata is X,bias_mV 
-                    # use the isel(X = x) 
-                    x_axis = xrdata.X.size
-
-                    #print(xrdata_prcssd[data_ch])
-
-                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([ find_peaks(xrdata[data_ch].isel(X = x).values, height =height, distance = distance, threshold = threshold)
-                                  for x in range(x_axis)], dtype = object )[:,1],
-                    dims=["X"],
-                    coords={"X": xrdata.X})
-
-                elif 'Y' in xrdata[data_ch].dims :
-                    # xrdata is Y,bias_mV 
-                    # use the isel(Y = y) 
-                    y_axis = xrdata.Y.size
-
-                    #print(xrdata_prcssd[data_ch])
-
-                    '''xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values, height =height, distance = distance,threshold = threshold)
-                                  for y in range(y_axis)], dtype = object )[:,1],
-                    dims=["Y"],
-                    coords={"Y": xrdata.Y})'''
-                    xrdata_prcssd[data_ch+'_peaks_prominences'] =  xr.DataArray (
-
-
-                        , grid_LDOS_sg_pk.[data_ch+'_peaks'].isel(X=1).values.tolist() )[0]
-                        ###################
-                        #peaks, _ = find_peaks(x)
-                        #prominences = peak_prominences(x, peaks)[0]
-                        ##################
-
-                        np.array([ peak_prominences( find_peaks(xrdata[data_ch].isel(Y = y).values, xrdata.[data_ch+'_peaks']), 
-
-                                  find_peaks(xrdata[data_ch].isel(Y = y).values, height =height, distance = distance,threshold = threshold)
-                                  for y in range(y_axis)], dtype = object )[:,1],
-                    dims=["Y"],
-                    coords={"Y": xrdata.Y})
-
-
-                # ==> updated 
-                """            
-            elif len(xrdata[data_ch].dims) == 3:
-                print('dim ==3')
-                x_axis = xrdata.X.size
-                y_axis = xrdata.Y.size
-                print (data_ch)
-                """xrdata_prcssd[data_ch+'_peaks']= xr.DataArray(np.ones((xAxis,yAxis), dtype = object),
-                                                                 dims=["X", "Y"],
-                                                                 coords={"X": xrdata.X, "Y": xrdata.Y} )"""
-                xrdata_prcssd[data_ch+'_peaks_prominience'] = xr.DataArray (
-                    np.array([ peak_prominences(xrdata[data_ch].isel(X = x, Y = y).values, xrdata[data_ch+'_peaks'].isel(X = x, Y = y).values.tolist())[0]
-                              for y in range(y_axis)  
-                              for x in range(x_axis)], dtype = object ).reshape(x_axis,y_axis),
-                    dims=["X", "Y"],
-                    coords={"X": xrdata.X, "Y": xrdata.Y})         
-            elif len(xrdata[data_ch].dims) == 1:
-                print('dim ==1')
-                if 'bias_mV' in xrdata.dims: 
-                    for data_ch in xrdata: 
-                        xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch], height =height, distance = distance,threshold = threshold))
-                else : pass
-    return xrdata_prcssd
-#grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
-
 # +
-def peak_pad(xrdata):
+def peak_pad(xrdata, padding_value = np.nan):
     xrdata_prcssd = xrdata.copy(deep = True)
     
     
@@ -1012,7 +893,7 @@ def peak_pad(xrdata):
                     peaks = xrdata[data_ch].values
                     peaks_count_max = max([ len(peaks_r) 
                                     for peaks_r in peaks])
-                    padding_value = np.nan
+                    #padding_value = np.nan
                     #print(xrdata_prcssd[data_ch])
                     
                     peaks_pad = np.array(
@@ -1034,7 +915,7 @@ def peak_pad(xrdata):
                     peaks = xrdata[data_ch].values
                     peaks_count_max = max([ len(peaks_r) 
                                     for peaks_r in peaks])
-                    padding_value = np.nan
+                    #padding_value = np.nan
                     #print(xrdata_prcssd[data_ch])
                     
                     peaks_pad = np.array(
@@ -1063,7 +944,7 @@ def peak_pad(xrdata):
                 peaks_count_max = max([ len(peaks_r_c) 
                                 for peaks_r in peaks
                                 for  peaks_r_c in peaks_r])
-                padding_value = np.nan
+                #padding_value = np.nan
 
                 peaks_pad = np.array([
                     np.pad(peaks_r_c.astype(float), 
@@ -1091,7 +972,7 @@ def peak_pad(xrdata):
                     #print(data_ch)
                     peaks = np.array(xrdata[data_ch].to_numpy().tolist()[0])
                     #print(peaks)
-                    padding_value = np.nan
+                    #padding_value = np.nan
                     #print((0,peaks_count_max-len(peaks)))
                     #print(xrdata_prcssd[data_ch])
                     
@@ -1111,33 +992,38 @@ def peak_pad(xrdata):
 #grid_3D_sg_pks_pad = peak_pad(grid_3D_sg_pks)
 #grid_3D_sg_pks_pad
 # -
-def find_peaks_properties_xr(xrdata, height= None, threshold=None, distance=None): 
+def find_peaks_properties_xr(xrdata, find_peaks_in_ch = 'LDOS_fb', height= None, threshold=None, distance=None): 
     from scipy.signal import find_peaks, peak_prominences
-    xrdata_prcssd = xrdata.copy(deep = True)
-    print('Use the find_peaks_xr first to find peaks in STS to an xarray Dataset.')
     
-    for data_ch in xrdata:
+    xrdata_prcssd = xrdata.copy(deep = True)
+    
+    print('Use this function only after find_peaks_xr  & peak_pad')
+    # counting irregular number of dimension issue 
+    # each pixel will have different pixel number 
+    # use peak_pad for peak # as a dimension 
+    print (' use padding_value= 0, & remove peaks at index zero' ) 
+    # peak_pad filling --> 0 
+    
+    
+    for ch_i, data_ch in enumerate(xrdata):
 
-        if len(xrdata[data_ch].dims) == 1:
-            if '_peaks' in data_ch : pass #print (data_ch)
-            else: 
-                print (data_ch+ ' peak_properties check')
+        if data_ch == find_peaks_in_ch:
+            print (data_ch + 'dims = '+ str(len(xrdata[data_ch].dims)))
+            # channel dim is not good variable to assign grid_line or grid_map
+            
+            if len(xrdata[data_ch].dims) == 1:
+                if data_ch == find_peaks_in_ch : 
+                    print (data_ch+ ' peak_properties check for dim ==1')
+                    if 'bias_mV' in xrdata.dims: 
+                        for data_ch in xrdata: 
+                            xrdata_prcssd[data_ch+'_peaks_pad'] = xr.DataArray (peak_prominences(xrdata[data_ch].values[0,:], xrdata[data_ch+'_peaks_pad'].values[0,:])[0])
+                    else : pass
+                else: pass
 
-                print('dim ==1')
-                if 'bias_mV' in xrdata.dims: 
-                    for data_ch in xrdata: 
-                        xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (find_peaks (xrdata[data_ch], height =height, distance = distance,threshold = threshold))
-                else : pass
-
-
-        elif len(xrdata[data_ch].dims) == 2:
-            if '_peaks' in data_ch : pass #print (data_ch)
-            else: 
-                print('dim ==2')
-                # smoothing filter only for the 3D data set
-                        # ==> updated             
-
-
+    
+            elif ( len(grid_LDOS_sg_pk.X) == 1 ) or (len(grid_LDOS_sg_pk.Y) == 1 ) :
+                print (data_ch+ ' peak_properties check for dim ==2')
+                # smoothing filter only for the 3D data set# ==> updated             
                 ### 2D data case 
                 ### assume that coords are 'X','Y','bias_mV'
                 #### two case X,bias_mV or Y,bias_mV 
@@ -1148,11 +1034,11 @@ def find_peaks_properties_xr(xrdata, height= None, threshold=None, distance=None
                     print('Along X')
                     #print(xrdata_prcssd[data_ch])
 
-                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([ peak_prominences(xrdata[data_ch].isel(X = x).values, xrdata[data_ch+'_peaks'].isel(X = x).values.tolist())[0]
-                                  for x in range(x_axis)], dtype = object )[:,0],
-                    dims=["X"],
-                    coords={"X": xrdata.X})
+                    xrdata_prcssd[data_ch+'_peak_prominence'] = xr.DataArray (
+                        np.array([ peak_prominences(xrdata[data_ch].isel(X = x).values[0,:], xrdata[data_ch+'_peaks_pad'].isel(X = x).values[0,:])
+                                  for x in range(x_axis)], dtype = float ),
+                    dims=["X", "prominence", "peaks"],
+                    coords={"X": xrdata.X, "peaks": xrdata.peaks, "prominence":['prominences', 'left_bases','right_basis']})
 
                 elif 'Y' in xrdata[data_ch].dims :
                     # xrdata is Y,bias_mV 
@@ -1162,89 +1048,42 @@ def find_peaks_properties_xr(xrdata, height= None, threshold=None, distance=None
                     #print(xrdata_prcssd[data_ch])
 
                     xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([peak_prominences(xrdata[data_ch].isel(Y = y).values, xrdata[data_ch+'_peaks'].isel(Y = y).values.tolist())[0]
-                                  for y in range(y_axis)], dtype = object )[:,0],
-                    dims=["Y"],
-                    coords={"Y": xrdata.Y})
+                        np.array([peak_prominences(xrdata[data_ch].isel(Y = y).values[0,:], xrdata[data_ch+'_peaks_pad'].isel(Y = y).values[0,:])
+                                  for y in range(y_axis)], dtype = float ),
+                    dims=["Y", "prominence", "peaks"],
+                    coords={"Y": xrdata.Y, "peaks": xrdata.peaks, "prominence":['prominences', 'left_bases','right_basis']})
+                else: 
+                     print (data_ch + ': channel is not for prominence finding dim==2')
+                    # ==> updated 
 
-                # ==> updated 
+            elif ( len(grid_LDOS_sg_pk.X) != 1 ) & (len(grid_LDOS_sg_pk.Y) != 1 ) :
+                if data_ch == find_peaks_in_ch : 
 
-
-                """
-                ### 2D data case 
-                ### assume that coords are 'X','Y','bias_mV'
-                #### two case X,bias_mV or Y,bias_mV 
-                if 'X' in xrdata[data_ch].dims :
-                    # xrdata is X,bias_mV 
-                    # use the isel(X = x) 
+                    print('dim ==3')
                     x_axis = xrdata.X.size
-
-                    #print(xrdata_prcssd[data_ch])
-
-                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([ find_peaks(xrdata[data_ch].isel(X = x).values, height =height, distance = distance, threshold = threshold)
-                                  for x in range(x_axis)], dtype = object )[:,1],
-                    dims=["X"],
-                    coords={"X": xrdata.X})
-
-                elif 'Y' in xrdata[data_ch].dims :
-                    # xrdata is Y,bias_mV 
-                    # use the isel(Y = y) 
                     y_axis = xrdata.Y.size
+                    print (ch_i,data_ch)
+                    print ('prominence checking')
+                    xrdata_prcssd[data_ch+'_peaks_prominience'] = xr.DataArray (
+                        np.array([ peak_prominences(xrdata[data_ch].isel(X = x, Y = y).values[0,:], xrdata[data_ch+'_peaks_pad'].isel(X = x, Y = y).values[0,:])[0]
+                                  for y in range(y_axis)  
+                                  for x in range(x_axis)], dtype = float ).reshape(x_axis,y_axis),
+                        dims=["X", "Y","peaks","prominence" ],
+                        coords={"X": xrdata.X, "Y": xrdata.Y, "peaks": xrdata.peaks, "prominence":['prominences', 'left_bases','right_basis']})
 
-                    #print(xrdata_prcssd[data_ch])
-
-                    '''xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
-                        np.array([ find_peaks(xrdata[data_ch].isel(Y = y).values, height =height, distance = distance,threshold = threshold)
-                                  for y in range(y_axis)], dtype = object )[:,1],
-                    dims=["Y"],
-                    coords={"Y": xrdata.Y})'''
-                    xrdata_prcssd[data_ch+'_peaks_prominences'] =  xr.DataArray (
-
-
-                        , grid_LDOS_sg_pk.[data_ch+'_peaks'].isel(X=1).values.tolist() )[0]
-                        ###################
-                        #peaks, _ = find_peaks(x)
-                        #prominences = peak_prominences(x, peaks)[0]
-                        ##################
-
-                        np.array([ peak_prominences( find_peaks(xrdata[data_ch].isel(Y = y).values, xrdata.[data_ch+'_peaks']), 
-
-                                  find_peaks(xrdata[data_ch].isel(Y = y).values, height =height, distance = distance,threshold = threshold)
-                                  for y in range(y_axis)], dtype = object )[:,1],
-                    dims=["Y"],
-                    coords={"Y": xrdata.Y})
-
-
-                # ==> updated 
-                """            
-        elif len(xrdata[data_ch].dims) == 3:
-            if '_peaks' in data_ch : pass #print (data_ch)
-            else: 
-                print('dim ==3')
-                x_axis = xrdata.X.size
-                y_axis = xrdata.Y.size
-                print (data_ch)
-                """xrdata_prcssd[data_ch+'_peaks']= xr.DataArray(np.ones((xAxis,yAxis), dtype = object),
-                                                                 dims=["X", "Y"],
-                                                                 coords={"X": xrdata.X, "Y": xrdata.Y} )"""
-                xrdata_prcssd[data_ch+'_peaks_prominience'] = xr.DataArray (
-                    np.array([ peak_prominences(xrdata[data_ch].isel(X = x, Y = y).values, xrdata[data_ch+'_peaks'].isel(X = x, Y = y).values.tolist())[0]
-                              for y in range(y_axis)  
-                              for x in range(x_axis)], dtype = object ).reshape(x_axis,y_axis),
-                    dims=["X", "Y"],
-                    coords={"X": xrdata.X, "Y": xrdata.Y})
-                
-                
-                
-                ### there is something wrong here...
-                ###  check the find peak functions again ..
-                
-                
-                print('_peak_prominence')
-        else : print ('done ')
-
-
+                    ### there is something wrong here...
+                    ###  check the find peak functions again ..
+                else:                     
+                    print (data_ch + str(ch_i)+ ': channel is not for prominence finding, dim ==3')
+                    print('_peak_prominence_skip')
+                    #xrdata_prcssd[data_ch] = xrdata[data_ch]
+                    print (data_ch, ch_i)
+                    print (data_ch+ ' peak_properties check not for this c hannel , for dim ==3')
+            else: pass
+    
+                                            
+        else : pass
+        
     return xrdata_prcssd
 #grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
 
