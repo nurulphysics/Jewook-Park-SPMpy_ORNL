@@ -533,7 +533,7 @@ z_LIX_fNb_xr
                 
         data_vars_name = [Z_P1fwd, Z_P1bwd, LIX_P1fwd,LIX_Pbwd, Z_P2fwd, Z_P2bwd, LIX_P2fwd,LIX_P2bwd]
     else:    
-    
+
 
 
 # +

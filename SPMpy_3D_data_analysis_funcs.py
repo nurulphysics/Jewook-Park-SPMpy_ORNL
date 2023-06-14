@@ -992,6 +992,101 @@ def peak_pad(xrdata, padding_value = np.nan):
 #grid_3D_sg_pks_pad = peak_pad(grid_3D_sg_pks)
 #grid_3D_sg_pks_pad
 # -
+def find_peaks_prominence_xr(xrdata, find_peaks_in_ch = 'LDOS_fb', height= None, threshold=None, distance=None): 
+    from scipy.signal import find_peaks, peak_prominences
+    
+    xrdata_prcssd = xrdata.copy(deep = True)
+    
+    print('Use this function only after find_peaks_xr  & peak_pad')
+    # counting irregular number of dimension issue 
+    # each pixel will have different pixel number 
+    # use peak_pad for peak # as a dimension 
+    print (' use padding_value= 0, & remove peaks at index zero' ) 
+    # peak_pad filling --> 0 
+    
+    
+    for ch_i, data_ch in enumerate(xrdata):
+
+        if data_ch == find_peaks_in_ch:
+            print (data_ch + 'dims = '+ str(len(xrdata[data_ch].dims)))
+            # channel dim is not good variable to assign grid_line or grid_map
+            
+            if len(xrdata[data_ch].dims) == 1:
+                if data_ch == find_peaks_in_ch : 
+                    print (data_ch+ ' peak_properties check for dim ==1')
+                    if 'bias_mV' in xrdata.dims: 
+                        for data_ch in xrdata: 
+                            xrdata_prcssd[data_ch+'_peaks_pad'] = xr.DataArray (peak_prominences(xrdata[data_ch].values[0,:], xrdata[data_ch+'_peaks_pad'].values[0,:])[0])
+                    else : pass
+                else: pass
+
+    
+            elif ( len(xrdata.X) == 1 ) or (len(xrdata.Y) == 1 ) :
+                print (data_ch+ ' peak_properties check for dim ==2')
+                # smoothing filter only for the 3D data set# ==> updated             
+                ### 2D data case 
+                ### assume that coords are 'X','Y','bias_mV'
+                #### two case X,bias_mV or Y,bias_mV 
+                if 'X' in xrdata[data_ch].dims :
+                    # xrdata is X,bias_mV 
+                    # use the isel(X = x) 
+                    x_axis = xrdata.X.size
+                    print('Along X')
+                    #print(xrdata_prcssd[data_ch])
+
+                    xrdata_prcssd[data_ch+'_peak_prominence'] = xr.DataArray (
+                        np.array([ peak_prominences(xrdata[data_ch].isel(X = x).values[0,:], xrdata[data_ch+'_peaks_pad'].isel(X = x).values[0,:])
+                                  for x in range(x_axis)], dtype = float ),
+                    dims=["X", "prominence", "peaks"],
+                    coords={"X": xrdata.X, "peaks": xrdata.peaks, "prominence":['prominences', 'left_bases','right_basis']})
+
+                elif 'Y' in xrdata[data_ch].dims :
+                    # xrdata is Y,bias_mV 
+                    # use the isel(Y = y) 
+                    y_axis = xrdata.Y.size
+                    print('Along Y')
+                    #print(xrdata_prcssd[data_ch])
+
+                    xrdata_prcssd[data_ch+'_peaks'] = xr.DataArray (
+                        np.array([peak_prominences(xrdata[data_ch].isel(Y = y).values[0,:], xrdata[data_ch+'_peaks_pad'].isel(Y = y).values[0,:])
+                                  for y in range(y_axis)], dtype = float ),
+                    dims=["Y", "prominence", "peaks"],
+                    coords={"Y": xrdata.Y, "peaks": xrdata.peaks, "prominence":['prominences', 'left_bases','right_basis']})
+                else: 
+                     print (data_ch + ': channel is not for prominence finding dim==2')
+                    # ==> updated 
+
+            elif ( len(xrdata.X) != 1 ) & (len(xrdata.Y) != 1 ) :
+                if data_ch == find_peaks_in_ch : 
+
+                    print('dim ==3')
+                    x_axis = xrdata.X.size
+                    y_axis = xrdata.Y.size
+                    print (ch_i,data_ch)
+                    print ('prominence checking')
+                    xrdata_prcssd[data_ch+'_peaks_prominience'] = xr.DataArray (
+                        np.array([ peak_prominences(xrdata[data_ch].isel(X = x, Y = y).values[0,:], xrdata[data_ch+'_peaks_pad'].isel(X = x, Y = y).values[0,:])[0]
+                                  for y in range(y_axis)  
+                                  for x in range(x_axis)], dtype = float ).reshape(x_axis,y_axis),
+                        dims=["X", "Y","peaks","prominence" ],
+                        coords={"X": xrdata.X, "Y": xrdata.Y, "peaks": xrdata.peaks, "prominence":['prominences', 'left_bases','right_basis']})
+
+                    ### there is something wrong here...
+                    ###  check the find peak functions again ..
+                else:                     
+                    print (data_ch + str(ch_i)+ ': channel is not for prominence finding, dim ==3')
+                    print('_peak_prominence_skip')
+                    #xrdata_prcssd[data_ch] = xrdata[data_ch]
+                    print (data_ch, ch_i)
+                    print (data_ch+ ' peak_properties check not for this c hannel , for dim ==3')
+            else: pass
+    
+                                            
+        else : pass
+        
+    return xrdata_prcssd
+#grid_2D_sg_pks = find_peaks_xr(grid_2D_sg)
+
 def find_peaks_properties_xr(xrdata, find_peaks_in_ch = 'LDOS_fb', height= None, threshold=None, distance=None): 
     from scipy.signal import find_peaks, peak_prominences
     
@@ -1002,6 +1097,7 @@ def find_peaks_properties_xr(xrdata, find_peaks_in_ch = 'LDOS_fb', height= None,
     # each pixel will have different pixel number 
     # use peak_pad for peak # as a dimension 
     print (' use padding_value= 0, & remove peaks at index zero' ) 
+    print (' this function will be updated later for properties dict in case of prominence or width was given for peak finding ' )
     # peak_pad filling --> 0 
     
     
@@ -1229,7 +1325,9 @@ def grid3D_line_avg_pks (xr_data, average_in =  'X',
                          ch_l_name = 'LIX_unit_calc',
                          height = None,
                          distance = None,
-                         threshold = None) : 
+                         threshold = None,
+                         prominence=None, width=None,
+                         padding_value = np.nan) : 
 
     if average_in ==  'X':
         mean_direction = 'X'
@@ -1256,7 +1354,8 @@ def grid3D_line_avg_pks (xr_data, average_in =  'X',
                 savgolFilter_xr(
                     xr_data_l.differentiate(coord='bias_mV')
                 ).differentiate(coord='bias_mV')
-            )*-1, height =height, distance = distance, threshold = threshold))
+            )*-1, height =height, distance = distance, threshold = threshold, prominence=prominence, width=width), 
+        padding_value = padding_value)
     if average_in ==  'X':
         xr_data_l_pks.attrs['line_direction'] ='Y'
     elif average_in ==  'Y': 
