@@ -3383,7 +3383,87 @@ def rotate_2D_xr (xrdata, rotation_angle):
     # after rotation, replace the padding to rotated image 
     return xrdata_rot
 
+
 # # # More?
 #
 # --
 # ---
+
+# *  drift compensation function. .
+# *  conceptually right. 
+#     * working performance is not good yet..)
+# * not perfectly working. 
+# * need to improve ... (for loop...) ==>def another function  to use it in the list comprehesion  use? 
+# * apply the same mechnism to the 2D channels 
+# * make a 3D function 
+#
+# * 
+
+# +
+def drift_compensation_y_topo_crrltn (xr_data_topo, y_sub_n=5, drift_interpl_method='nearest'): 
+    y_N = len (xr_data_topo.Y)
+    y_sub_n = y_sub_n
+    #y_j = 0 
+    offset = np.array([0, y_N//2])
+    # use for loop 
+    print ('only for topo, 2D data, apply to 3D data & other channels later ')
+    for y_j  in range (len (xr_data_topo.Y)//y_sub_n - 1) :
+        y_N = len (xr_data_topo.Y)
+        #print (y_j)
+
+        Y_sub_n0 = y_j*y_sub_n * xr_data_topo.Y_spacing
+        Y_sub_n1 = (y_j+1)*y_sub_n * xr_data_topo.Y_spacing
+        Y_sub_n2 = (y_j+2)*y_sub_n * xr_data_topo.Y_spacing
+        #print (Y_sub_n0, Y_sub_n1, Y_sub_n2)
+        # check Y drift comparision area 
+        # use y_sub_n = 5 ==> 0-5, 6-10, 10-5, ... 
+        line0 = xr_data_topo.where(xr_data_topo.Y >= Y_sub_n0, drop = True).where (xr_data_topo.Y < Y_sub_n1, drop = True ).topography
+        line1 = xr_data_topo.where(xr_data_topo.Y >=  Y_sub_n1, drop = True).where (xr_data_topo.Y <  Y_sub_n2, drop = True ).topography
+        # select two region for correlation search 
+        corrl_line0_line1 = sp.signal.correlate2d(line0.values, line1.values, mode = 'same')#  use mode = same area to use the line0 X& Y value
+        # search for the correlation. if correlation is not center --> drift. 
+        # but.. there will be an step edge (horizontal), or atomic lattice --> y_sub_n << atomic lattice 
+        ind_max = np.array (np.unravel_index(np.argmax(corrl_line0_line1, axis=None), corrl_line0_line1.shape)) # find max point 
+        # find argmax index point
+        #print (ind_max)
+        offset = np.vstack ([offset, ind_max])
+    
+    offset_0 = offset[: , -1] -  y_N//2
+    # check offset from center 
+    #offset_accumulation  = [ offset_0[:n+1].sum()  for n in range (len(offset_0)) ]
+    
+    offset_accumulation  = np.array ( [ offset_0[:n].sum()  
+                                       for n in range (len(offset_0)+1) ])*grid_topo.Y_spacing 
+    # offset is from between two region.. get an accumlated offset. for whole Y axis. 
+    offset_accumulation_df =pd.DataFrame (
+        np.vstack ([ np.array ([ y_j *y_sub_n *grid_topo.Y_spacing  
+                                for y_j in range(len (grid_topo.Y)//y_sub_n+1) ]), 
+                    offset_accumulation]).T, columns  =['Y','offset_X'])
+    offset_accumulation_xr  = offset_accumulation_df.set_index('Y').to_xarray()
+    offset_accumulation_xr_intrpl = offset_accumulation_xr.offset_X.interp(Y = grid_topo.Y.values,  method=drift_interpl_method)
+    # accumluted offset--> covert to df , xr, 
+    # accumnulated offset to compensate in X 
+    # use interpolation along Y --> point offset calc ==> apply to all y points. 
+
+    # for each lines, adjust value after offset compensated  ==> interpolated again. 
+    xr_data_topo_offset = xr_data_topo.copy(deep= True)
+    # dont forget deep copy... 
+    
+    for y_j, y  in enumerate (xr_data_topo.Y):
+        new_x_i =  xr_data_topo.isel (Y=y_j).X - offset_accumulation_xr_intrpl.isel(Y=y_j)
+        # for each y axis. shift X position 
+        xr_data_topo_offset_y_j = xr_data_topo_offset.isel (Y=y_j).assign_coords({"X": new_x_i}) 
+        # assign_coord as a new calibrated offset-X coords
+        xr_data_topo_offset_y_j_intp = xr_data_topo_offset_y_j.interp(X=xr_data_topo.X)
+        # using original X points, interpolated offset- topo --> set new topo value to original X position 
+        xr_data_topo_offset.topography[dict(Y = y_j)] =  xr_data_topo_offset_y_j_intp.topography
+        #grid_topo_offset.isel(Y=y_j).topography.values = grid_topo_offest_y_j_intp.topography
+        # use [dict()] for assign values , instead of isel() 
+        # isel is not working... follow the instruction manual in web.!
+    fig,axs = plt.subplots(ncols = 2, figsize = (6,3))
+    xr_data_topo.topography.plot(ax =axs[0])
+    xr_data_topo_offset.topography.plot(ax =axs[1])
+    plt.show()
+    return xr_data_topo_offset
+
+
