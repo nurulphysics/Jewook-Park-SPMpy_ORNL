@@ -104,6 +104,40 @@ except ModuleNotFoundError:
 # # Grid data analysis functions
 #
 
+##
+# find neares I =0 bias_mV 
+def Bias_mV_offset_test(grid_3D):
+    I_fb_avg_df = grid_3D.I_fb.mean (dim = ['X','Y']).to_dataframe().abs()
+    if I_fb_avg_df.I_fb.idxmin() == 0:
+        print ('Bias_mV is set to I = 0')
+    else:
+        print ('adjust Bias_mV Zero')
+    return 
+
+
+def grid_3D_unit_calc (grid_3D): 
+    '''
+    Grid_3D data contains 'I_fb' & 'LIX_fb' 
+    using numerical derivative of xr.differentiate 
+    compare the ration between  real [A/V] unit and measured Lockin 'pA' unit.
+    convert and make a new channel 'LIX_unit_calc'
+    
+    '''
+    grid_3D_dIdV_numeric = grid_3D.differentiate(coord = 'bias_mV').I_fb
+    # numerically calculated dI/dV from I_fb
+    LIX_convert_ratio = grid_3D_dIdV_numeric / grid_3D.LIX_fb
+
+    grid_3D['LIX_unit_calc'] = np.abs( LIX_convert_ratio.mean())*grid_3D.LIX_fb
+    
+    #grid_3D
+
+    return grid_3D
+    # in case of LIX offset exist.. 
+    # if it is metallic sample.. no problem 
+
+
+# # Need to make a bias_mV = 0 adjust function 
+
 # # find the gap region 
 # * gap size 
 #     * based on measurement error (I limit ~ 1E-11pA) or (Lock-in resolution limnit ~ 1E-11 pA ) find the gapped region in spectroscopy 
@@ -668,96 +702,89 @@ def plot_XYslice_w_LDOS (xr_data, sliderX, sliderY, ch ='LIX_fb', slicing_bias_m
     return plt.show()
 
 
-# +
-def find_plateau_tolarence_values (xr_data,  x_i ,     y_j , tolerance_I= 1E-10, tolerance_LIX = 1E-12,    ):
+def find_0plateau_gap(xr_data,tolerance_I =  0.2E-11, tolerance_LIX = 1E-11, apply_SGfilter = True):
     '''
+    check the tolerance_I  &  tolerance_LIx values in advance 
+    USE 'find_plateau_tolarence_values' function . 
     
-    Use slider in advance. 
-    check XY position with 
-    "plot_XYslice_w_LDOS" function 
-    
-        #### use the slider 
-        sliderX = pnw.IntSlider(name='X', 
-                           start = 0 ,
-                           end = grid_3D.X.shape[0]) 
-        sliderY = pnw.IntSlider(name='Y', 
-                           start = 0 ,
-                           end = grid_3D.Y.shape[0]) 
-
-        #sliderX_v_intact = interact(lambda x:  grid_3D.X[x].values, x =sliderX)[1]
-        #sliderY_v_intact = interact(lambda y:  grid_3D.Y[y].values, y =sliderY)[1]
-        pn.Column(interact(lambda x:  grid_3D.X[x].values, x =sliderX), interact(lambda y: grid_3D.Y[y].values, y =sliderY))
-        # Do not exceed the max Limit ==> error
-        # how to connect interactive values to the other cell --> need to update (later) 
-        x_i = sliderX.value
-        y_j = sliderY.value 
-    
-    
-    '''
-
-    print (x_i ,y_j)
-
-
-    fig,axes =  plt.subplots (ncols = 2, figsize = (6,3), sharex = True)
-    axs = axes.ravel()
-
-    # for I_fb
-    xr_data.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[0])
-    axs[0].axhline(y=tolerance_I, c='orange') # pos tolerance line
-    axs[0].axhline(y=-tolerance_I, c='orange') # neg tolerance line
-    # fill between x area where Y value is smaller than tolerance value 
-    axs[0].fill_between(xr_data.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
-                   where=abs(xr_data.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
-                   facecolor='yellow', interpolate=True, alpha=0.3)
-    # for LIX_fb
-    xr_data.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[1])
-    axs[1].axhline(y=tolerance_LIX, c='orange') # pos tolerance line
-    axs[1].axhline(y=-tolerance_LIX, c='orange') # neg tolerance line
-    # fill between x area where Y value is smaller than tolerance value 
-    axs[1].fill_between(xr_data.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
-                   where=abs(xr_data.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
-                   facecolor='yellow', interpolate=True, alpha=0.3)
-    return 
-
-
-
-# -
-
-def find_plateau(xr_data,tolerance_I=1E-10 , tolerance_LIX = 1E-11,apply_SGfilter = False):
-    '''
-    test tolerance_ & LIX. 
     plateau finding only. 
     apply SG & 1st , 2nd derivative in advance. 
+    Using both I_fb & LIX_fb, 
+    assign plateau as an intersection of I_fb & LIX_fb plateau 
+    
+    
     
     '''
     xr_data_prcssd = xr_data.copy(deep = True)
     print('Find plateau in I &LIX each points')
     if apply_SGfilter == True :
         print('import savgolFilter_xr in advance' )
-        xr_data_sg = savgolFilter_xr(xr_data, window_length = 21, polyorder = 3)
-        for data_ch in xr_data_sg:
-            if 'I_fb' in data_ch:
-                xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data_sg[data_ch]) <= tolerance_I  
-            else :#except 'I_fb' all is LIX result , use tolerance_LIX
-                xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data_sg[data_ch] ) <= tolerance_LIX
+        xr_data_sg = savgolFilter_xr(xr_data_prcssd, window_length = 21, polyorder = 3)
 
-    else:
-        print(' check plateau without smoothing (Savatzky-Golay filter)' )
-        
-    # savatzky golay filter & derivative using xr API
-    for data_ch in xr_data:
-        if 'I_fb' in data_ch:
-            xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data[data_ch]) <= tolerance_I  
-        else :#except 'I_fb' all is LIX result , use tolerance_LIX
-            xr_data_prcssd[data_ch+'_plateu'] = abs(xr_data[data_ch] ) <= tolerance_LIX
+    else : 
+        print ('without SavgolFilter_xr, check outliers')
+        xr_data_sg = xr_data_prcssd
 
-    return xr_data_prcssd
+    if 'I_fb' in xr_data.data_vars : 
+        I_fb_plateau = abs(xr_data_sg['I_fb']) <= tolerance_I 
+    else :
+        I_fb_plateau = abs(xr_data_sg['LIX_fb']) <= tolerance_LIx  
+        print ('No I_fb channel, use LIX instead')
+
+    if 'LIX_unit_calc' in xr_data.data_vars : 
+        LIX_fb_plateau = abs(xr_data_sg['LIX_unit_calc']) <= tolerance_LIX 
+    else: 
+        LIX_fb_plateau = abs(xr_data_sg['LIX_fb']) <= tolerance_LIX 
+        print ('No LIX_unit_calc channel, use LIX instead')
+
+    I_LIX_plateau = I_fb_plateau*LIX_fb_plateau
+    # pixels in X,Y, bias_mV  intersection of plateau
+  
+
+    xr_data_sg['I_LIX_plateau']=I_LIX_plateau
+    
+    # out figure
+    gap_pos0_I = grid_3D.where(I_LIX_plateau).I_fb.idxmax(dim='bias_mV')
+    gap_neg0_I = grid_3D.where(I_LIX_plateau).I_fb.idxmin(dim='bias_mV')
+    gap_mapI = gap_pos0_I-gap_neg0_I
+
+    gap_pos0_LIX = grid_3D.where(I_LIX_plateau).LIX_unit_calc.idxmax(dim='bias_mV')
+    gap_neg0_LIX = grid_3D.where(I_LIX_plateau).LIX_unit_calc.idxmin(dim='bias_mV')
+    gap_map_LIX = gap_pos0_LIX - gap_neg0_LIX
+
+    fig,axes = plt.subplots(ncols=3, nrows = 2 , figsize= (9,6))
+    axs= axes.ravel()
+    gap_pos0_I.plot(ax = axs[0] )
+    axs[0].set_title('gap_I_0+')
+    gap_neg0_I.plot(ax = axs[1])
+    axs[1].set_title('gap_I_0+')
+    gap_mapI.plot(ax = axs[2])
+    axs[2].set_title('gap_map_I')
+
+    gap_pos0_LIX.plot(ax = axs[3])
+    axs[3].set_title('gap_LIX_0+')
+    gap_neg0_LIX.plot(ax = axs[4])
+    axs[4].set_title('gap_LIX_0+')
+    gap_map_LIX.plot(ax = axs[5])
+    axs[5].set_title('gap_map_LIX')
+    axs[0].set_aspect(1)
+    axs[1].set_aspect(1)
+    axs[2].set_aspect(1)
+    axs[3].set_aspect(1)
+    axs[4].set_aspect(1)
+    axs[5].set_aspect(1)
+    fig.suptitle('tolerance_I = '+str(tolerance_I) + "& tolerance_LIX = " + str(tolerance_LIX) )
+    
+    plt.tight_layout()
+
+    plt.show()
+
+    return xr_data_sg
 
 
 # +
-def find_plateau_tolarence_values (xr_data,  x_i ,     y_j , tolerance_I= 1E-10, tolerance_LIX = 1E-12,    ):
+def find_plateau_tolarence_values (xr_data, x_i ,  y_j ,ch ='LIX_fb',slicing_bias_mV = 2, tolerance_I= 1E-10, tolerance_LIX = 1E-12):
     '''
-    
     Use slider in advance. 
     check XY position with 
     "plot_XYslice_w_LDOS" function 
@@ -783,26 +810,45 @@ def find_plateau_tolarence_values (xr_data,  x_i ,     y_j , tolerance_I= 1E-10,
 
     print (x_i ,y_j)
 
-
-    fig,axes =  plt.subplots (ncols = 2, figsize = (6,3), sharex = True)
+    fig,axes =  plt.subplots (ncols = 3, figsize = (9,3))
     axs = axes.ravel()
-
+    
+    # plot 2D map with x_i & y_j 
+    
+    isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
+                    ax =  axs[0],
+                    robust = True)
+    axs[0].hlines(y_j,0,xr_data.X.shape[0], lw = 1, color = 'c')
+    axs[0].vlines(x_i,0,xr_data.Y.shape[0], lw = 1, color = 'm')  
+    
+    
+    
     # for I_fb
-    xr_data.I_fb.isel(X = x_i, Y = y_j).plot(ax =axs[0])
-    axs[0].axhline(y=tolerance_I, c='orange') # pos tolerance line
-    axs[0].axhline(y=-tolerance_I, c='orange') # neg tolerance line
+    sns.lineplot (xr_data.I_fb.isel(X = x_i, Y = y_j).to_dataframe(), x= 'bias_mV',y= 'I_fb', ax =axs[1])
+    axs[1].axhline(y=tolerance_I, c='orange') # pos tolerance line
+    axs[1].axhline(y=-tolerance_I, c='orange') # neg tolerance line
     # fill between x area where Y value is smaller than tolerance value 
-    axs[0].fill_between(xr_data.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
+    axs[1].fill_between(xr_data.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_I, tolerance_I, 
                    where=abs(xr_data.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
                    facecolor='yellow', interpolate=True, alpha=0.3)
+    
     # for LIX_fb
-    xr_data.LIX_fb.isel(X = x_i, Y = y_j).plot(ax = axs[1])
-    axs[1].axhline(y=tolerance_LIX, c='orange') # pos tolerance line
-    axs[1].axhline(y=-tolerance_LIX, c='orange') # neg tolerance line
+    sns.lineplot (xr_data.LIX_fb.isel(X = x_i, Y = y_j).to_dataframe(), x= 'bias_mV',y= 'LIX_fb', ax =axs[2])
+    axs[2].axhline(y=tolerance_LIX, c='magenta') # pos tolerance line
+    axs[2].axhline(y=-tolerance_LIX, c='magenta') # neg tolerance line
     # fill between x area where Y value is smaller than tolerance value 
-    axs[1].fill_between(xr_data.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+    axs[2].fill_between(xr_data.LIX_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
                    where=abs(xr_data.LIX_fb.isel(X = x_i, Y = y_j)) <= tolerance_LIX,
-                   facecolor='yellow', interpolate=True, alpha=0.3)
+                   facecolor='cyan', interpolate=True, alpha=0.3)
+                  
+    axs[2].fill_between(xr_data.I_fb.isel(X = x_i, Y = y_j).bias_mV, -tolerance_LIX, tolerance_LIX, 
+                        where=abs(xr_data.I_fb.isel(X = x_i, Y = y_j)) <= tolerance_I,
+                        facecolor='yellow', interpolate=True, alpha=0.3)
+                  
+                  
+    plt.tight_layout()
+    plt.show()
+    
     return 
 
 

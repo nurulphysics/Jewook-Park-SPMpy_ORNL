@@ -262,6 +262,22 @@ grid_3D = grid_xr[['I_fb','LIX_fb']]
 # averaged I & LIX 
 # -
 
+##
+# find neares I =0 bias_mV 
+def Bias_mV_offset_test(grid_3D):
+    I_fb_avg_df = grid_3D.I_fb.mean (dim = ['X','Y']).to_dataframe().abs()
+    if I_fb_avg_df.I_fb.idxmin() == 0:
+        print ('Bias_mV is set to I = 0')
+    else:
+        print ('adjust Bias_mV Zero')
+    return 
+
+
+Bias_mV_offset_test(grid_3D)
+#grid_3D.I_fb.mean(dim= ['X','Y']).abs()
+
+grid_3D
+
 # ### 1.2.3. Unit calculation (LDOS_fb)
 #     * for semiconductor: CBM,VBM check. gap_map check
 #     * add gap_maps to grid_2D
@@ -279,6 +295,7 @@ grid_2D['gap_map_LIX'] = grid_3D_gap.gap_size_LIX # add gap map to topo data
 
 grid_LDOS = grid_3D_gap[['LDOS_fb' ]]
 grid_LDOS
+
 # -
 
 # ### 1.4 Topography view 
@@ -355,8 +372,8 @@ grid_LDOS_2deriv_sg.isel(X=1).LDOS_fb.plot()
 
 # +
 #crrlt2D_topo_LDOS_np_0 =sp.signal.correlate2d( grid_top_ref.values, grid_LDOS.LDOS_fb.isel(bias_mV = 0 ).values, mode='valid')
+# -
 
-# +
 def drift_compensation_y_topo_crrltn (xr_data_topo, y_sub_n=5, drift_interpl_method='nearest'): 
     y_N = len (xr_data_topo.Y)
     y_sub_n = y_sub_n
@@ -958,7 +975,10 @@ plt.show()
 #########################################################################
 # -
 
-grid_LDOS_sg= savgolFilter_xr(grid_LDOS, polyorder=5)
+grid_LDOS_rot = rotate_3D_xr(grid_LDOS,rotation_angle=-40)
+
+
+grid_LDOS_sg= savgolFilter_xr(grid_LDOS_rot, polyorder=5)
 
 # +
 ##################################
@@ -1009,9 +1029,8 @@ dmap*bbox_points
 bound_box
 
 
-grid_LDOS_bbox,_ = hv_bbox_avg(grid_LDOS_sg, ch ='LDOS_fb',slicing_bias_mV=0.1 , bound_box = bound_box)
 
-grid_LDOS_bbox_pk.where(grid_LDOS_bbox_pk.LDOS_fb_peaks_pad!=0)
+grid_LDOS_bbox,_ = hv_bbox_avg(grid_LDOS_sg, ch ='LDOS_fb',slicing_bias_mV=0.1 , bound_box = bound_box)
 
 # +
 # grid_LDOS_bbox
@@ -1022,7 +1041,7 @@ grid_LDOS_bbox_pk  = grid3D_line_avg_pks( grid_LDOS_bbox ,
                                          ch_l_name ='LDOS_fb',
                                          average_in= 'Y',
                                          distance = 10, 
-                                         width= 5,
+                                         width= 3,
                                          threshold = 1E-12, 
                                          padding_value= 0,prominence= 3E-11
                                         ) 
@@ -1090,6 +1109,137 @@ bound_box
 # ## 2.2 Smoothing 
 # ### 2.2.1. Savatzky-Golay (SG) smoothig
 
+grid_3D.I_fb
+
+#grid_3D.I_fb.mean(dim = ['X', 'Y']).to_dataframe()
+ax = sns.scatterplot(grid_3D.I_fb.mean(dim = ['X', 'Y']).to_dataframe(), x='bias_mV', y = 'I_fb') 
+ax.set_xlim(-1E-1,1E-1)
+ax.set_ylim(-1E-12,1E-12)
+
+
+##
+# find neares I =0 bias_mV 
+def Bias_mV_offset_test(grid_3D):
+    I_fb_avg_df = grid_3D.I_fb.mean (dim = ['X','Y']).to_dataframe().abs()
+    if I_fb_avg_df.I_fb.idxmin() == 0:
+        print ('Bias_mV is set to I = 0')
+    else:
+        print ('adjust Bias_mV Zero')
+    return 
+
+
+Bias_mV_offset_test(grid_3D)
+
+
+def grid_3D_unit_calc (grid_3D): 
+    '''
+    Grid_3D data contains 'I_fb' & 'LIX_fb' 
+    using numerical derivative of xr.differentiate 
+    compare the ration between  real [A/V] unit and measured Lockin 'pA' unit.
+    convert and make a new channel 'LIX_unit_calc'
+    
+    '''
+    grid_3D_dIdV_numeric = grid_3D.differentiate(coord = 'bias_mV').I_fb
+    # numerically calculated dI/dV from I_fb
+    LIX_convert_ratio = grid_3D_dIdV_numeric / grid_3D.LIX_fb
+
+    grid_3D['LIX_unit_calc'] = np.abs( LIX_convert_ratio.mean())*grid_3D.LIX_fb
+    
+    #grid_3D
+
+    return grid_3D
+    # in case of LIX offset exist.. 
+    # if it is metallic sample.. no problem 
+
+
+#grid_3D = grid_3D.drop_vars('LIX_unit_calc')
+grid_3D = grid_3D_unit_calc(grid_3D)
+grid_3D
+
+# +
+# LIX unit calibration 
+# pA unit : lock-in result 
+# LIX_unit_calc : calibrated as [A/V] unit for dI/dV
+
+grid_3D_dIdV_numeric = grid_3D.differentiate(coord = 'bias_mV').I_fb
+# numerically calculated dI/dV from I_fb
+LIX_convert_ratio = grid_3D_dIdV_numeric / grid_3D.LIX_fb
+
+grid_3D['LIX_unit_calc'] = np.abs( LIX_convert_ratio.mean())*grid_3D.LIX_fb
+
+
+# +
+# eg_superconductor 
+# I_Zero_gap = LIX_Zero_gap 
+# if there is difference. ==> adjust LIX value back to Zero
+
+
+###############################################################
+# make a I_fb, LIX_fb_unit_calc, gap_map,plateau_map, LDOS_fb 
+#  as an final channel, 
+#################################################################
+
+# +
+## find a plateau first. 
+
+#use plateau function 
+
+# -
+
+#
+# ### 2.3 finding plateau
+#     * 2.3.1. prepare plateau detection function for Grid_xr, point 
+#     * 2.3.2. prepare plateau detection function for Grid_xr
+#
+#
+
+# #### 2.3.1. prepare plateau detection function for Grid_xr, point 
+#
+#     * set  Tolerence to find plateau
+#
+#         * 2.3.1.1. Set tolerance for I_fb * LIX_fb
+
+# +
+# set tolerance for I_fb * LIX_fb
+tolerance_I, tolerance_LIX = 1E-11, 0.3E-11
+xr_data = grid_3D
+#tolerance_I, tolerance_dIdV, tolerance_d2IdV2 = 1E-10,1E-10,1E-10
+#tolerance_LIX, tolerance_dLIXdV , tolerance_d2LIXdV2  = 1E-11,1E-11,1E-11
+sliderX = pnw.IntSlider(name='X', 
+                       start = 0 ,
+                       end = xr_data.X.shape[0]) 
+sliderY = pnw.IntSlider(name='Y', 
+                       start = 0 ,
+                       end = xr_data.Y.shape[0]) 
+
+#sliderX_v_intact = interact(lambda x:  grid_3D.X[x].values, x =sliderX)[1]
+#sliderY_v_intact = interact(lambda y:  grid_3D.Y[y].values, y =sliderY)[1]
+pn.Column(interact(lambda x:  xr_data.X[x].values, x =sliderX), interact(lambda y: xr_data.Y[y].values, y =sliderY))
+# -
+
+find_plateau_tolarence_values(grid_3D, x_i= sliderX.value  ,  y_j= sliderY.value ,ch ='LIX_fb',slicing_bias_mV = 2, tolerance_I= 1E-11, tolerance_LIX = 1E-12)
+
+# #### 2.3.1.2. find_plateau  xarray 
+#     * After checking which tolerance is relaible for plateau detection
+#     * for SC gap..  dIdV or dLIX/dV ?
+#     * grid_LDOS_rot_sg
+
+# +
+grid_3D
+
+
+# -
+
+#grid_3D #= grid_3D.drop('I_LIX_plateau')
+grid_3D = find_0plateau_gap(grid_3D)
+
+grid_3D
+
+# +
+find peaks 
+
+
+
 # +
 # grid_3D -> sg -> derivative 
 grid_LDOS_rot= grid_LDOS.copy()
@@ -1113,42 +1263,6 @@ sns.lineplot( x = 'bias_mV',
 plt.tight_layout()
 plt.show()
 
-
-# ## 2.3 Numerical derivative 
-#     * Derivative + SG smoothing
-#
-# ### 2.3.1. SG + 1stderiv + SG + 2nd deriv + SG
-
-# +
-
-grid_LDOS_rot_sg_1deriv = grid_LDOS_rot_sg.differentiate('bias_mV')
-grid_LDOS_rot_sg_1deriv_sg = savgolFilter_xr(grid_LDOS_rot_sg_1deriv, window_length = 51, polyorder = 5)
-grid_LDOS_rot_sg_2deriv = grid_LDOS_rot_sg_1deriv_sg.differentiate('bias_mV')
-grid_LDOS_rot_sg_2deriv_sg =  savgolFilter_xr(grid_LDOS_rot_sg_2deriv, window_length = 51, polyorder = 5)
-grid_LDOS_rot_sg_2deriv_sg
-# -
-
-#
-# ### 2.3 finding plateau
-#     * 2.3.1. prepare plateau detection function for Grid_xr, point 
-#     * 2.3.2. prepare plateau detection function for Grid_xr
-#
-#
-
-# #### 2.3.1. prepare plateau detection function for Grid_xr, point 
-#
-#     * set  Tolerence to find plateau
-#
-#         * 2.3.1.1. Set tolerance for I_fb * LIX_fb
-
-# set tolerance for I_fb * LIX_fb
-tolerance_I, tolerance_dIdV, tolerance_d2IdV2 = 1E-10,1E-10,1E-10
-tolerance_LIX, tolerance_dLIXdV , tolerance_d2LIXdV2  = 1E-11,1E-11,1E-11
-
-# #### 2.3.1.2. Using hovolview, XY selection 
-# * Choose a point for peak detection 
-
-grid_LDOS_rot_sg
 
 # +
 #### use the slider 
@@ -1174,8 +1288,32 @@ pn.Column(interact(lambda x:  xr_data.X[x].values, x =sliderX), interact(lambda 
 # +
 #grid_LDOS_rot_sg
 
-plot_XYslice_w_LDOS(grid_LDOS_rot_sg, sliderX= sliderX, sliderY= sliderY, ch = 'LDOS_fb',slicing_bias_mV = 10)
+plot_XYslice_w_LDOS(grid_LDOS_rot_sg, sliderX= sliderX, sliderY= sliderY, ch = 'LDOS_fb',slicing_bias_mV = 0)
 # -
+
+# ## 2.3 Numerical derivative 
+#     * Derivative + SG smoothing
+#
+# ### 2.3.1. SG + 1stderiv + SG + 2nd deriv + SG
+
+# +
+
+grid_LDOS_rot_sg_1deriv = grid_LDOS_rot_sg.differentiate('bias_mV')
+grid_LDOS_rot_sg_1deriv_sg = savgolFilter_xr(grid_LDOS_rot_sg_1deriv, window_length = 51, polyorder = 5)
+grid_LDOS_rot_sg_2deriv = grid_LDOS_rot_sg_1deriv_sg.differentiate('bias_mV')
+grid_LDOS_rot_sg_2deriv_sg =  savgolFilter_xr(grid_LDOS_rot_sg_2deriv, window_length = 51, polyorder = 5)
+grid_LDOS_rot_sg_2deriv_sg
+# -
+
+grid_3D_plateau
+
+grid_LDOS_rot_sg_1deriv_sg_plateau = find_plateau(grid_LDOS_rot_sg_1deriv_sg)
+grid_LDOS_rot_sg_1deriv_sg_plateau
+
+# #### 2.3.1.2. Using hovolview, XY selection 
+# * Choose a point for peak detection 
+
+grid_LDOS_rot_sg
 
 # #### 2.3.1.3. Test proper tolerance levels at XY point
 
@@ -1183,10 +1321,6 @@ fig,ax = plt.subplots(1,1)
 grid_3D.I_fb.isel(X=43,Y=49).plot()
 #ax.set_xlim(-0.1,0.1)
 #ax.set_ylim(-0.2E-12,0.2E-12)
-plt.show()
-
-find_plateau_tolarence_values(grid_3D,tolerance_I=1E-11, tolerance_LIX=1E-12,  x_i = sliderX.value,     y_j = sliderY.value)
-# with preset function 
 plt.show()
 
 # #### 2.3.1.4. Display plateau region by using 1st and 2nd derviative (I_fb & LIX_fb) 
@@ -1444,18 +1578,9 @@ axs[2].set_ylabel("d2LIXdV2")
 
 fig.tight_layout()
 plt.show()
+
+
 # -
-
-# #### 2.3.1.5. find_plateau  xarray 
-#     * After checking which tolerance is relaible for plateau detection
-#     * for SC gap..  dIdV or dLIX/dV ?
-#     * grid_LDOS_rot_sg
-
-grid_LDOS_rot_sg_plateau = find_plateau(grid_LDOS_rot_sg)
-
-grid_LDOS_rot_sg_1deriv_sg_plateau = find_plateau(grid_LDOS_rot_sg_1deriv_sg)
-grid_LDOS_rot_sg_1deriv_sg_plateau
-
 
 # ### 2.4. peak finding and plot peaks with STS results 
 #
@@ -1832,80 +1957,6 @@ plt.show()
 sns.lineplot(x =  'X', y= 'topography', data = grid_topo_zm.topography.to_dataframe())
 plt.show()
 
-
-# +
-
-def savgolFilter_xr(xrdata,window_length=7,polyorder=3): 
-    # window_length = odd number
-    #import copy
-    #xrdata_prcssd = copy.deepcopy(xrdata)
-    xrdata_prcssd = xrdata.copy()
-    print('Apply a Savitzky-Golay filter to an xarray Dataset.')
-
-    for data_ch in xrdata:
-
-        if len(xrdata[data_ch].dims) == 2:
-            print('3D data')
-            # smoothing filter only for the 3D data set
-            # ==> updaded 
-            xrdata_prcssd[data_ch]
-            ### 2D data case 
-            ### assume that coords are 'X','Y','bias_mV'
-            #### two case X,bias_mV or Y,bias_mV 
-            if 'X' in xrdata[data_ch].dims :
-                x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
-                # xrdata is X,bias_mV 
-                # use the isel(X = x) 
-                xrdata_prcssd[data_ch] = xr.DataArray (
-                    np.array (
-                        [sp.signal.savgol_filter(xrdata[data_ch].isel(X = x).values,
-                                                 window_length, 
-                                                 polyorder , 
-                                                 mode = 'nearest')
-                         for x in range(x_axis)]),
-                    dims = ["X", "bias_mV"],
-                    coords = {"X": xrdata.X,
-                              "bias_mV": xrdata.bias_mV})
-            elif 'Y' in xrdata[data_ch].dims  :                # xrdata is XY,bias_mV                 # use the isel(Y = y) 
-                y_axis = xrdata.Y.size
-                xrdata_prcssd[data_ch] = xr.DataArray (
-                    np.array (
-                        [sp.signal.savgol_filter(xrdata[data_ch].isel(Y = y).values,
-                                                 window_length, 
-                                                 polyorder , 
-                                                 mode = 'nearest')
-                         for y in range(y_axis) ]),
-                    dims = ["Y", "bias_mV"],
-                    coords = {"Y": xrdata.Y,
-                              "bias_mV": xrdata.bias_mV}
-                )
-            else: pass
-            
-        elif len(xrdata[data_ch].dims) == 3:
-            x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
-            y_axis = xrdata.Y.size
-            print (data_ch)
-            xrdata_prcssd[data_ch] = xr.DataArray (
-                np.array ([
-                    sp.signal.savgol_filter(xrdata[data_ch].isel(X = x, Y = y).values,
-                                            window_length, 
-                                            polyorder , 
-                                            mode = 'nearest')
-                    for y in range(y_axis) 
-                    for x in range(x_axis)
-                ] ).reshape(y_axis,x_axis, xrdata.bias_mV.size),
-                dims = ["Y", "X", "bias_mV"],
-                coords = {"X": xrdata.X,
-                          "Y": xrdata.Y,
-                          "bias_mV": xrdata.bias_mV}            )
-            # transpose np array to correct X&Y direction 
-        else : pass
-    return xrdata_prcssd
-
-#grid_2D_sg = savgolFilter_xr(grid_2D)
-#grid_2D_sg
-
-
 # +
 grid_LDOS_sg = savgolFilter_xr(grid_LDOS_zm, window_length=21, polyorder=5)
 grid_LDOS_1diff =  grid_LDOS_sg.differentiate('bias_mV')
@@ -1962,6 +2013,8 @@ isns.imshow(grid_LDOS_zm.LDOS_fb.sel(bias_mV =0, method = 'nearest'), robust = T
 # #  save npy for tomviz 
 
 
+grid_LDOS_rot=grid_LDOS_bbox.copy()
+
 # +
 # use grid_LDOS_rot for 120x 120 
 #grid_LDOS_rot
@@ -1974,7 +2027,27 @@ grid_LDOS_2diff_sg = savgolFilter_xr(grid_LDOS_2diff, window_length=61, polyorde
 
 # -
 
-grid_LDOS_2diff_sg_dps_pad_mV.LDOS_fb_peaks_mV.sum()
+grid_LDOS_2diff_sg_dps = find_peaks_xr(-1*grid_LDOS_2diff_sg,distance = 10, width = 5,threshold = 2E-12,prominence= 4E-11 )
+grid_LDOS_2diff_sg_dps_pad = peak_pad ( grid_LDOS_2diff_sg_dps)
+grid_LDOS_2diff_sg_dps_pad
+
+# +
+grid_LDOS_2diff_sg_dps_pad_mV = peak_mV_3Dxr(grid_LDOS_2diff_sg_dps_pad, ch = 'LDOS_fb')
+
+grid_LDOS_2diff_sg_dps_pad_mV#grid_LDOS_2diff_sg_dps_pad_mV.LDOS_fb_peaks_mV.sum()
+
+
+grid_LDOS_2diff_sg_dps_pad_mV = peak_mV_3Dxr(grid_LDOS_2diff_sg_dps_pad, ch= 'LDOS_fb')
+#grid_LDOS_2diff_sg_zm_dps_pad_mV
+
+
+
+grid_LDOS_rot['LDOS_pk_mV'] = (grid_LDOS_2diff_sg_dps_pad_mV.LDOS_fb_peaks_mV * grid_LDOS_rot.LDOS_fb).astype(float)
+grid_LDOS_rot
+# extract the peak positions 
+# -
+
+np.save('LDOS_pk_zm_mV.npy', grid_LDOS_rot.LDOS_pk_mV.where((grid_LDOS_rot.bias_mV> - 3.6)& (grid_LDOS_rot.bias_mV<3.6), drop = True).to_numpy())
 
 # +
 grid_LDOS_2diff_sg_dps = find_peaks_xr ( - grid_LDOS_2diff_sg, distance= 5)
