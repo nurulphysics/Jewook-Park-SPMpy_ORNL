@@ -29,7 +29,7 @@
 # ## **Sample** :<font color= White, font size="5" > $FeTe_{0.55}Se_{0.45}$ (new) </font> 
 #     * Cleaving: @ UHV Loadlock chamber, Room temp.
 # ## **Tip: PtIr (from Unisoku)**
-# ## Measurement temp: LHeT (4.8K)
+# ## Measurement temp: mK (< 40 mK)
 #
 
 # # <font color= orange > 0. Preparation  </font>
@@ -240,7 +240,7 @@ files_df[files_df.type=='3ds']#.file_name.iloc[0]
 # 3D data 
 #grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[2])
 # line data
-grid_xr = grid_line2xr(files_df[files_df.type=='3ds'].file_name.iloc[2])
+grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[1])
 grid_xr
 
 # ## 1-2.2. Separate topography / gird_3D (I_fb, LIX_fb)
@@ -447,7 +447,7 @@ grid_topo_test = plane_fit_y_xr(grid_xr[['topography']])
 
 
 #grid_topo.topography.plot()
-grid_topo_offset = drift_compensation_y_topo_crrltn(grid_topo_test, y_sub_n=3, drift_interpl_method= "nearest")
+grid_topo_offset = drift_compensation_y_topo_crrltn(grid_topo_test, y_sub_n=5, drift_interpl_method= "nearest")
 # -
 
 fig,axs = plt.subplots(ncols = 2, figsize = (6,3))
@@ -468,8 +468,8 @@ crrlt2D_topo_LDOS = pd.DataFrame (crrlt2D_topo_LDOS_np_valid, columns  = ['corre
 #crrlt2D_topo_LDOS.correlation2D.to_numpy()
 
 #sp.signal.find_peaks(crrlt2D_topo_LDOS)
-crrltn_pk_idx = sp.signal.argrelextrema(crrlt2D_topo_LDOS.correlation2D.to_numpy(), np.greater, order = 9)
-crrltn_dp_idx = sp.signal.argrelextrema(crrlt2D_topo_LDOS.correlation2D.to_numpy(), np.less, order = 9 )
+crrltn_pk_idx = sp.signal.argrelextrema(crrlt2D_topo_LDOS.correlation2D.to_numpy(), np.greater, order = 7)
+crrltn_dp_idx = sp.signal.argrelextrema(crrlt2D_topo_LDOS.correlation2D.to_numpy(), np.less, order = 7)
 # order: range.. 
 
 
@@ -495,35 +495,38 @@ sns.lineplot(crrlt2D_topo_LDOS, ax =axs[1])
 sns.scatterplot(data = crrlt2D_topo_LDOS_extrema, ax= axs[1])
 
 plt.show()
+# -
 
+
+str(grid_LDOS.bias_mV[crrltn_pk_idx[0]][1].values.round(2))
 
 # +
-g= isns.ImageGrid (grid_LDOS.isel(bias_mV= crrltn_pk_idx[0]).LDOS_fb.values, col_wrap =3, height =2) 
+g= isns.ImageGrid (grid_LDOS.isel(bias_mV= crrltn_pk_idx[0]).LDOS_fb.values, col_wrap =6, height =2) 
 
 slicemV = grid_LDOS.bias_mV[crrltn_pk_idx[0]].values.round(2)
-
-g.axes[0][0].set_title(str(slicemV[0])+' mV')
-g.axes[0][1].set_title(str(slicemV[1])+' mV')
-g.axes[0][2].set_title(str(slicemV[2])+' mV')
-g.axes[1][0].set_title(str(slicemV[3])+' mV')
-g.axes[1][1].set_title(str(slicemV[4])+' mV')
 g.fig.suptitle('peak')
+col_wrap =6
+for axes_i  in range( len(crrltn_pk_idx[0])):
+    #print (int(axes_i/col_wrap),axes_i%col_wrap)  # axes number check 
+    g.axes[int((axes_i)/col_wrap)][axes_i%col_wrap].set_title(
+        str(grid_LDOS.bias_mV[crrltn_pk_idx[0]][axes_i].values.round(2))+' mV')
+
+
 plt.tight_layout()
 plt.show()
 
 
 
 # +
-g= isns.ImageGrid (grid_LDOS.isel(bias_mV= crrltn_dp_idx[0]).LDOS_fb.values, col_wrap =3, height = 2 ) 
+g= isns.ImageGrid (grid_LDOS.isel(bias_mV= crrltn_dp_idx[0]).LDOS_fb.values, col_wrap =6, height = 2 ) 
 
 slicemV = grid_LDOS.bias_mV[crrltn_dp_idx[0]].values.round(2)
+col_wrap =6
+for axes_i  in range( len(crrltn_dp_idx[0])):
+    #print (int(axes_i/col_wrap),axes_i%col_wrap)  # axes number check 
+    g.axes[int((axes_i)/col_wrap)][axes_i%col_wrap].set_title(
+        str(grid_LDOS.bias_mV[crrltn_dp_idx[0]][axes_i].values.round(2))+' mV')
 
-g.axes[0][0].set_title(str(slicemV[0])+' mV')
-g.axes[0][1].set_title(str(slicemV[1])+' mV')
-g.axes[0][2].set_title(str(slicemV[2])+' mV')
-g.axes[1][0].set_title(str(slicemV[3])+' mV')
-g.axes[1][1].set_title(str(slicemV[4])+' mV')
-g.axes[1][2].set_title(str(slicemV[5])+' mV')
 g.fig.suptitle('dip')
 plt.tight_layout()
 plt.show()
@@ -534,12 +537,11 @@ plt.show()
 slicemV = grid_LDOS.bias_mV[crrltn_dp_idx[0]].values.round(2)
 slicemV
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
 # ## how to switch the plot 90 deg 
 
 # +
 grid_LDOS_sg_crrlt  = grid_LDOS_sg.bias_mV.to_dataframe()
-grid_LDOS_sg_crrlt['crrlt_w_topo'] = grid_line_LDOS_topo_crrlt
+grid_LDOS_sg_crrlt['crrlt_w_topo'] = crrlt2D_topo_LDOS
 
 #sns.lineplot (grid_LDOS_sg_crrlt.crrlt_w_topo)
 
@@ -594,13 +596,13 @@ plt.show()
 #     * hv_bias_mV_slicing
 #     * hv_XY_slicing
 
-hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb',frame_width=400).opts(clim = (0,1E-10))
+hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb',frame_width=400)#.opts(clim = (0,1E-10))
 #hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb').opts(clim = (0,1.5E-10)) # adjust cbar limit
 
 # ####  1.5.2. Y or X slicing 
 
-#hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y')#.opts(clim=(0, 1E-10)) 
-hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X').opts(clim=(0, 2E-10)) # check low intensity area
+hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y').opts(clim=(0, 1E-10)) 
+#hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X').opts(clim=(0, 2E-10)) # check low intensity area
 #hv_XY_slicing(grid_3D,slicing= 'Y').opts(clim=(0, 1E-11))
 
 
@@ -700,11 +702,44 @@ LDOS_fb_area_df_melt
 sns.lineplot(x= 'bias_mV', y = 'LDOS', data = LDOS_fb_area_df_melt, hue ='Area')
 plt.show()
 
-fig, axs = plt.subplots(ncols = 2, figsize = (6,3))
+# +
+# Bbox1 & Bbox2 
+
+
+
+fig, axs = plt.subplots(ncols = 3, figsize = (9,3))
 isns.imshow(plane_fit_y_xr(grid_topo).topography, cmap ='copper', ax = axs[0])
-isns.imshow (grid_LDOS.LDOS_fb.sel(bias_mV = 3, method ='nearest'),ax = axs[1])
+
+# add patach bb1 & bb2
+import matplotlib.patches as patches
+
+rec_x0_bb1, rec_y0_bb1 = bbox_1.X[0],bbox_1.Y[0]
+rec_width_bb1,rec_height_bb1 = bbox_1.X[-1]- bbox_1.X[0], bbox_1.Y[-1]- bbox_1.Y[0]
+
+rec_xy_bb1 = (int(rec_x0_bb1/grid_LDOS.X_spacing), int(rec_y0_bb1/grid_LDOS.Y_spacing))
+rec_w_px_bb1,rec_h_px_bb1 = int(rec_width_bb1/grid_LDOS.X_spacing),int(rec_height_bb1/grid_LDOS.Y_spacing)
+
+rec_x0_bb2, rec_y0_bb2 = bbox_2.X[0],bbox_2.Y[0]
+rec_width_bb2,rec_height_bb2 = bbox_2.X[-1]- bbox_2.X[0], bbox_2.Y[-1]- bbox_2.Y[0]
+
+rec_xy_bb2 = (int(rec_x0_bb2/grid_LDOS.X_spacing), int(rec_y0_bb2/grid_LDOS.Y_spacing))
+rec_w_px_bb2,rec_h_px_bb2 = int(rec_width_bb2/grid_LDOS.X_spacing),int(rec_height_bb2/grid_LDOS.Y_spacing)
+
+rec_in_topo_bb1 =  patches.Rectangle( rec_xy_bb1 , rec_w_px_bb1,rec_h_px_bb1 , linewidth=1, edgecolor='blue', facecolor='none')
+rec_in_topo_bb2 =  patches.Rectangle( rec_xy_bb2 , rec_w_px_bb2,rec_h_px_bb2 , linewidth=1, edgecolor='orange', facecolor='none')
+
+axs[0].add_patch(rec_in_topo_bb1)
+axs[0].add_patch(rec_in_topo_bb2)
+
+isns.imshow (grid_LDOS.LDOS_fb.sel(bias_mV = 0, method ='nearest'),ax = axs[1])
+# LDOS_bias_mV
+
+sns.lineplot(x= 'bias_mV', y = 'LDOS', data = LDOS_fb_area_df_melt, hue ='Area', ax =axs[2])
+# area averaged BB1 BB2  STS
+
 plt.tight_layout()
 plt.show()
+# -
 
 
 # #### plot LODS slices using isns image grid 
@@ -724,18 +759,27 @@ plt.show()
 
 
 
-bias_mV_slices= [8, 6, 4,2, 0, 2, 4, 6, 8][::-1]
+bias_mV_slices= [-4, -3, -2, -1, 0, 1, 2,3, 4][::-1]
 
-bias_mV_slices_v = grid_LDOS.bias_mV.sel(bias_mV = bias_mV_slices, method = "nearest").values.astype(int)
+bias_mV_slices_v = grid_LDOS.bias_mV.sel(bias_mV = bias_mV_slices, method = "nearest").values#.round(2)
+bias_mV_slices_v
+# -
 
-g = isns.ImageGrid(grid_LDOS.LDOS_fb.values, cbar=False, height=2, col_wrap=5, slices= bias_mV_slices , cmap="bwr", robust = True)
+grid_LDOS
+
+
+# +
+# value --> use Where ! 
+
+
+g = isns.ImageGrid(grid_LDOS.LDOS_fb.values, cbar=False, height=2, col_wrap=5, slices= bias_mV_slices_v , cmap="bwr", robust = True)
 
 col_wrap=5
 # set a col_wrap for suptitle 
 
 for axes_i  in range( len(bias_mV_slices)):
     #print (int(axes_i/col_wrap),axes_i%col_wrap)  # axes number check 
-    g.axes[int((axes_i)/col_wrap)][axes_i%col_wrap].set_title(str(bias_mV_slices_v[axes_i])+' mV')
+    g.axes[int((axes_i)/col_wrap)][axes_i%col_wrap].set_title(str(bias_mV_slices_v[axes_i].round(2))+' mV')
 plt.tight_layout()
 plt.show()
 # -
