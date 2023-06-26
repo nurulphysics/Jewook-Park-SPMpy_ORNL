@@ -2528,6 +2528,12 @@ def th_multiotsu_roi_label_2D_xr(xr_data, bias_mV_th = 200, multiclasses = 3):
 
 
 def th_mean_roi_label_2D_xr(xr_data, bias_mV_th = 200, threshold_flip = False):
+    '''
+    bias_mV_th = threshold_mean_xr at the given bias
+    skimage measure  label functino applied to given bias rolling image 
+    
+    '''
+    
     xr_data_prcssd = xr_data.copy()
     xr_data_prcssd['LDOS_fb_th'] = threshold_mean_xr(xr_data.sel(bias_mV=bias_mV_th, method="nearest"), threshold_flip= threshold_flip).LDOS_fb
     xr_data_prcssd['LDOS_fb_th_label'] = xr_data_prcssd['LDOS_fb_th'].copy()

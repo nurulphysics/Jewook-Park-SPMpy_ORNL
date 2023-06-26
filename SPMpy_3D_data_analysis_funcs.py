@@ -473,6 +473,109 @@ def plot_XYslice_w_LDOS (xr_data, data_channel='LIX_fb', slicing_bias_mV = 2):
 # only after bbox setup & streaming bound_box positions
 
 
+def hv_bbox_topo_avg (xr_data, bound_box , ch = 'topography' ):
+    '''
+    ** only after Bound box settup with hV 
+    
+        import holoviews as hv
+        from holoviews import opts
+        hv.extension('bokeh')
+
+        grid_channel_hv = hv.Dataset(grid_3D.I_fb)
+
+        # bias_mV slicing
+        dmap_plane  = ["X","Y"]
+        dmap = grid_channel_hv.to(hv.Image,
+                                  kdims = dmap_plane,
+                                  dynamic = True )
+        dmap.opts(colorbar = True,
+                  cmap = 'bwr',
+                  frame_width = 200,
+                  aspect = 'equal')#.relabel('XY plane slicing: ')
+
+        grid_channel_hv_image  = hv.Dataset(grid_3D.I_fb.isel(bias_mV = 0)).relabel('for BBox selection : ')
+
+        bbox_points = hv.Points(grid_channel_hv_image).opts(frame_width = 200,
+                                                            color = 'k',
+                                                            aspect = 'equal',
+                                                            alpha = 0.1,                                   
+                                                            tools=['box_select'])
+
+        bound_box = hv.streams.BoundsXY(source = bbox_points,
+                                        bounds=(0,0,0,0))
+        dmap*bbox_points
+        
+        add grid_topo line profile 
+
+    
+    '''
+    import holoviews as hv
+    from holoviews import opts
+    hv.extension('bokeh')
+    # slicing bias_mV = 5 mV
+    
+    #bound_box.bounds
+    x_bounds_msk = (xr_data.X > bound_box.bounds[0] ) & (xr_data.X < bound_box.bounds[2])
+    y_bounds_msk = (xr_data.Y > bound_box.bounds[1] ) & (xr_data.Y < bound_box.bounds[3])
+
+    xr_data_bbox = xr_data.where (xr_data.X[x_bounds_msk] + xr_data.Y[y_bounds_msk])
+    
+    isns.reset_defaults()
+    isns.set_image(origin = 'lower')
+    # isns image directino setting 
+
+    fig,axs = plt.subplots (nrows = 1,
+                            ncols = 3,
+                            figsize = (12,4))
+
+    isns.imshow(xr_data[ch].values,
+                ax =  axs[0],
+                robust = True)
+
+    # add rectangle for bbox 
+    from matplotlib.patches import Rectangle
+    # find index value of bound box 
+
+    Bbox_x0 = np.abs((xr_data.X-bound_box.bounds[0]).to_numpy()).argmin()
+    Bbox_y0 = np.abs((xr_data.Y-bound_box.bounds[1]).to_numpy()).argmin()
+    Bbox_x1 = np.abs((xr_data.X-bound_box.bounds[2]).to_numpy()).argmin()
+    Bbox_y1 = np.abs((xr_data.Y-bound_box.bounds[3]).to_numpy()).argmin()
+    Bbox = Bbox_x0,Bbox_y0,Bbox_x1,Bbox_y1
+    # substract value, absolute value with numpy, argmin returns index value
+
+    # when add rectangle, add_patch used index 
+    axs[0].add_patch(Rectangle((Bbox_x0 , Bbox_y0 ), 
+                               Bbox_x1 -Bbox_x0 , Bbox_y1-Bbox_y0,
+                               edgecolor = 'pink',
+                               fill=False,
+                               lw=2,
+                               alpha=0.5))
+
+    isns.imshow(xr_data_bbox[ch].values,
+                ax =  axs[1],
+                robust = True)
+
+    # topography along longer axis 
+    if xr_data_bbox.X.size > xr_data_bbox.Y.size : 
+        avg_dim =[ 'Y']
+    else : 
+        avg_dim =[ 'X']
+
+    sns.lineplot(xr_data_bbox.mean(dim = avg_dim).to_dataframe(),
+                 ax = axs[2])
+    #plt.savefig('grid011_bbox)p.png')
+    plt.show()
+    
+    # 3 figures will be diplayed, original image with Bbox area, BBox area zoom, BBox averaged STS
+    return xr_data_bbox, fig
+    # plot STS at the selected points 
+    # use the seaborn (confident interval : 95%) 
+    # sns is figure-level function 
+# +
+# function for drawing bbox averaged STS 
+# only after bbox setup & streaming bound_box positions
+
+
 def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
     '''
     ** only after Bound box settup with hV 
@@ -504,6 +607,8 @@ def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
         bound_box = hv.streams.BoundsXY(source = bbox_points,
                                         bounds=(0,0,0,0))
         dmap*bbox_points
+        
+        add grid_topo line profile 
 
     
     '''
@@ -521,7 +626,7 @@ def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
     isns.reset_defaults()
     isns.set_image(origin = 'lower')
     # isns image directino setting 
-    
+
     fig,axs = plt.subplots (nrows = 1,
                             ncols = 3,
                             figsize = (12,4))
@@ -691,8 +796,8 @@ def plot_XYslice_w_LDOS (xr_data, sliderX, sliderY, ch ='LIX_fb', slicing_bias_m
     axs[0].hlines(sliderY.value,0,xr_data.X.shape[0], lw = 1, color = 'c')
     axs[0].vlines(sliderX.value,0,xr_data.Y.shape[0], lw = 1, color = 'm')    
 
-    xr_data_Vline_profile.plot(ax = axs[1],robust = True)#, vmin = xr_data_Vline_profile.to_numpy().min() , vmax = xr_data_Vline_profile.to_numpy().max())
-    xr_data_Hline_profile.T.plot(ax = axs[2],robust = True)#, vmin = xr_data_Hline_profile.to_numpy().min() , vmax = xr_data_Hline_profile.to_numpy().max())
+    xr_data_Vline_profile.plot(ax = axs[1], robust = True)#, vmin = xr_data_Vline_profile.to_numpy().min() , vmax = xr_data_Vline_profile.to_numpy().max())
+    xr_data_Hline_profile.T.plot(ax = axs[2], robust = True)#, vmin = xr_data_Hline_profile.to_numpy().min() , vmax = xr_data_Hline_profile.to_numpy().max())
 
     xr_data[ch].isel(X =sliderX.value, Y =sliderY.value) .plot(ax =axs[3])
     #pn.Row(pn.Column(dmap_slideXY,xr_data_Vline_profile.plot()), )
@@ -744,12 +849,12 @@ def find_0plateau_gap(xr_data,tolerance_I =  0.2E-11, tolerance_LIX = 1E-11, app
     xr_data_sg['I_LIX_plateau']=I_LIX_plateau
     
     # out figure
-    gap_pos0_I = grid_3D.where(I_LIX_plateau).I_fb.idxmax(dim='bias_mV')
-    gap_neg0_I = grid_3D.where(I_LIX_plateau).I_fb.idxmin(dim='bias_mV')
+    gap_pos0_I = xr_data.where(I_LIX_plateau).I_fb.idxmax(dim='bias_mV')
+    gap_neg0_I = xr_data.where(I_LIX_plateau).I_fb.idxmin(dim='bias_mV')
     gap_mapI = gap_pos0_I-gap_neg0_I
 
-    gap_pos0_LIX = grid_3D.where(I_LIX_plateau).LIX_unit_calc.idxmax(dim='bias_mV')
-    gap_neg0_LIX = grid_3D.where(I_LIX_plateau).LIX_unit_calc.idxmin(dim='bias_mV')
+    gap_pos0_LIX = xr_data.where(I_LIX_plateau).LIX_unit_calc.idxmax(dim='bias_mV')
+    gap_neg0_LIX = xr_data.where(I_LIX_plateau).LIX_unit_calc.idxmin(dim='bias_mV')
     gap_map_LIX = gap_pos0_LIX - gap_neg0_LIX
 
     fig,axes = plt.subplots(ncols=3, nrows = 2 , figsize= (9,6))
@@ -1566,6 +1671,80 @@ def  grid_lineNpks_offset(xr_data_l_pks,
     return xr_data_l_pks_ch_slct, ch_l_name_df, ch_l_name_pks_df, fig
 
 
+
+
+# +
+# Check drift compensation result for each lines. 
+# use correlation between selected areas. 
+
+# not fully 
+# -
+
+def drift_compensation_y_topo_crrltn (xr_data_topo, y_sub_n=5, drift_interpl_method='nearest'): 
+    y_N = len (xr_data_topo.Y)
+    y_sub_n = y_sub_n
+    #y_j = 0 
+    offset = np.array([0, y_N//2])
+    # use for loop 
+    print ('only for topo, 2D data, apply to 3D data & other channels later ')
+    for y_j  in range (len (xr_data_topo.Y)//y_sub_n - 1) :
+        y_N = len (xr_data_topo.Y)
+        #print (y_j)
+
+        Y_sub_n0 = y_j*y_sub_n * xr_data_topo.Y_spacing
+        Y_sub_n1 = (y_j+1)*y_sub_n * xr_data_topo.Y_spacing
+        Y_sub_n2 = (y_j+2)*y_sub_n * xr_data_topo.Y_spacing
+        #print (Y_sub_n0, Y_sub_n1, Y_sub_n2)
+        # check Y drift comparision area 
+        # use y_sub_n = 5 ==> 0-5, 6-10, 10-5, ... 
+        line0 = xr_data_topo.where(xr_data_topo.Y >= Y_sub_n0, drop = True).where (xr_data_topo.Y < Y_sub_n1, drop = True ).topography
+        line1 = xr_data_topo.where(xr_data_topo.Y >=  Y_sub_n1, drop = True).where (xr_data_topo.Y <  Y_sub_n2, drop = True ).topography
+        # select two region for correlation search 
+        corrl_line0_line1 = sp.signal.correlate2d(line0.values, line1.values, mode = 'same')#  use mode = same area to use the line0 X& Y value
+        # search for the correlation. if correlation is not center --> drift. 
+        # but.. there will be an step edge (horizontal), or atomic lattice --> y_sub_n << atomic lattice 
+        ind_max = np.array (np.unravel_index(np.argmax(corrl_line0_line1, axis=None), corrl_line0_line1.shape)) # find max point 
+        # find argmax index point
+        #print (ind_max)
+        offset = np.vstack ([offset, ind_max])
+    
+    offset_0 = offset[: , -1] -  y_N//2
+    # check offset from center 
+    #offset_accumulation  = [ offset_0[:n+1].sum()  for n in range (len(offset_0)) ]
+    
+    offset_accumulation  = np.array ( [ offset_0[:n].sum()  
+                                       for n in range (len(offset_0)+1) ])*grid_topo.Y_spacing 
+    # offset is from between two region.. get an accumlated offset. for whole Y axis. 
+    offset_accumulation_df =pd.DataFrame (
+        np.vstack ([ np.array ([ y_j *y_sub_n *grid_topo.Y_spacing  
+                                for y_j in range(len (grid_topo.Y)//y_sub_n+1) ]), 
+                    offset_accumulation]).T, columns  =['Y','offset_X'])
+    offset_accumulation_xr  = offset_accumulation_df.set_index('Y').to_xarray()
+    offset_accumulation_xr_intrpl = offset_accumulation_xr.offset_X.interp(Y = grid_topo.Y.values,  method=drift_interpl_method)
+    # accumluted offset--> covert to df , xr, 
+    # accumnulated offset to compensate in X 
+    # use interpolation along Y --> point offset calc ==> apply to all y points. 
+
+    # for each lines, adjust value after offset compensated  ==> interpolated again. 
+    xr_data_topo_offset = xr_data_topo.copy(deep= True)
+    # dont forget deep copy... 
+    
+    for y_j, y  in enumerate (xr_data_topo.Y):
+        new_x_i =  xr_data_topo.isel (Y=y_j).X - offset_accumulation_xr_intrpl.isel(Y=y_j)
+        # for each y axis. shift X position 
+        xr_data_topo_offset_y_j = xr_data_topo_offset.isel (Y=y_j).assign_coords({"X": new_x_i}) 
+        # assign_coord as a new calibrated offset-X coords
+        xr_data_topo_offset_y_j_intp = xr_data_topo_offset_y_j.interp(X=xr_data_topo.X)
+        # using original X points, interpolated offset- topo --> set new topo value to original X position 
+        xr_data_topo_offset.topography[dict(Y = y_j)] =  xr_data_topo_offset_y_j_intp.topography
+        #grid_topo_offset.isel(Y=y_j).topography.values = grid_topo_offest_y_j_intp.topography
+        # use [dict()] for assign values , instead of isel() 
+        # isel is not working... follow the instruction manual in web.!
+    fig,axs = plt.subplots(ncols = 2, figsize = (6,3))
+    xr_data_topo.topography.plot(ax =axs[0])
+    xr_data_topo_offset.topography.plot(ax =axs[1])
+    plt.show()
+    return xr_data_topo_offset
 
 
 # ### Not Used Previous (WORKING)Functions (FOR 3d ONLY)
