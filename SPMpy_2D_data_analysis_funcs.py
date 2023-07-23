@@ -1637,7 +1637,7 @@ def  adaptive_equalize_hist_xr(xrdata, clip_limit = 0.03):
     return xrdata_prcssd
 
 
-# + [markdown] id="BRKASaSWwLa8" jp-MarkdownHeadingCollapsed=true
+# + [markdown] id="BRKASaSWwLa8"
 # #  8. Plot 2D images (xr data, seaborn-image)
 # > Seaborn-image package 
 # > * check (https://seaborn-image.sarthakjariwala.com/en/latest/index.html)

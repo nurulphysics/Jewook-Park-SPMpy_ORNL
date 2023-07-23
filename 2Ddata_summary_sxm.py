@@ -15,10 +15,10 @@
 
 # # SPMpy 
 # * Authors : Dr. Jewook Park at CNMS, ORNL
-#     * Center for Nanophase Materials Sciences (CNMS), Oak Ridge National Laboratory (ORNL)
+#     * Center for Nanophase Materials Sciences (CNMS), Oak Ridge National Laboratory (ORNL), United States
 #     * email :  parkj1@ornl.gov
 #         
-# > **SPMpy** is a python package to analysis scanning probe microscopy (SPM) data analysis, such as scanning tunneling microscopy and spectroscopy (STM/S) data and atomic force microscopy (AFM) images, which are inherently multidimensional. SPMpy exploits recent image processing(a.k.a. Computer Vision) techniques, and utilzes [building blocks](https://scipy-lectures.org/intro/intro.html#the-scientific-python-ecosystem) and excellent visualization tools available in the [scientific python ecosystem](https://holoviz.org/index.html). Many parts are inspired by well-known SPM data analysis programs, for example, [Wsxm](http://www.wsxm.eu/) and [Gwyddion](http://gwyddion.net/). SPMpy is trying to apply lessons from [Fundamentals in Data Visualization](https://clauswilke.com/dataviz/).
+# > **SPMpy** is a Python package to analyze scanning probe microscopy (SPM) data analysis, such as scanning tunneling microscopy and spectroscopy (STM/S) data and atomic force microscopy (AFM) images, which are inherently multidimensional. SPMpy exploits recent image processing(a.k.a. Computer Vision) techniques and utilizes [building blocks](https://scipy-lectures.org/intro/intro.html#the-scientific-python-ecosystem) and excellent visualization tools available in the [scientific Python ecosystem](https://holoviz.org/index.html). Many parts are inspired by well-known SPM data analysis programs, for example, [Wsxm](http://www.wsxm.eu/) and [Gwyddion](http://gwyddion.net/). SPMpy is trying to apply lessons from [Fundamentals in Data Visualization](https://clauswilke.com/dataviz/).
 #
 # >  **SPMpy** is an open-source project. (Github: https://github.com/jewook-park/SPMpy_ORNL )
 # > * Contributions, comments, ideas, and error reports are always welcome. Please use the Github page or email parkj1@ornl.gov. Comments & remarks should be in Korean or English. 
@@ -209,7 +209,7 @@ sxm_file_groups = list(set(sxm_file_list_df["group"]))
 sxm_file_groups
 #############################
 # sxm file loading by using img2xr
-# xr format으로 파일 불러오기
+#  convert to xr format
 # (e.g.) # img2xr(file_list_df.file_name.iloc[0])
 #############################
 # spmdata_xr = img2xr(file_list_df.file_name[0])
@@ -227,20 +227,20 @@ folder_name  = os.getcwd().split('\\')[-1]
 # final folder 
 pptx_file_name =  folder_name+ '_automated.pptx'
 
-prs = Presentation() # empty_file #빈파일 하나 지정 
+prs = Presentation() # empty_file #
 #``` Page 0 ``````````
 sld0_slide_layout = prs.slide_layouts[0] # title slide (layout_type =  [0] )
 
 slide0 = prs.slides.add_slide(sld0_slide_layout)
-# add title slide in the pptx file # 슬라이드를 하나 더했음. 
+# add title slide in the pptx file # 
 
 # title page set up 
 sld0_title = slide0.shapes.title
 sld0_subtitle = slide0.placeholders[1]
-# title & sub_title for the title slide  
-# 0 번째 슬라이드에 title과 subtitle 넣음 
+# title & sub_title for the title slide (0th) 
+ 
 sld0_title.text = 'Nanonois 2D images' + '\n' +  'in '+ folder_name 
-# title 지정 
+# set title 
 sld0_subtitle.text = 'by using SPMpy \n  Jewook Park '
 
 #``` Page 1 ``````````
@@ -253,8 +253,8 @@ slide1_contents  = slide1.shapes.placeholders[1].text_frame
 # choose 'shapes' in 'slide1' 
 # assigne 'title' & 'contents(text)'  in 'shapes' 
 
-slide1_title.text = 'file list (*.sxm)' # 제목설정 
-slide1_contents.text = 'file groups' # 내용설정
+slide1_title.text = 'file list (*.sxm)' # set title
+slide1_contents.text = 'file groups' # set contents
 # add 'text' in the 'title'  object 
 
 for group in sxm_file_groups:
@@ -266,7 +266,6 @@ for group in sxm_file_groups:
     sld1_paragraph_1.text = files_df[files_df.group ==  group].file_name.min() + '\n ~ ' + files_df[files_df.group ==  group].file_name.max()
     sld1_paragraph_1.level = 3    
     # add paragraph in the contents  : Files (start-end) name
-    # 내용에 단락 추가
 prs.save(pptx_file_name)  
 
 # add group_name & number of files as a paragraph

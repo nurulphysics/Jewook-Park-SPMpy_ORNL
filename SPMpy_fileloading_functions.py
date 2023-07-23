@@ -875,10 +875,12 @@ def img2xr (loading_sxm_file, center_offset = False):
     ############################
     # check the XY ratio 
     ############################
-    if  size_x == size_y : 
+    #    if  size_x == size_y : 
+    if  dim_px == dim_py : 
+
         pass
     else : 
-        print ('size_x != size_y')
+        print ('dim_px != dim_py')
     # if xy size is not same, report it! 
 
     if step_dx != step_dy :
@@ -971,7 +973,6 @@ def img2xr (loading_sxm_file, center_offset = False):
 
     return z_LIX_fNb_xr
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true
 # ## <font color=blue>3. Grid to xarray </font>
 #
 #
@@ -1027,7 +1028,7 @@ except ModuleNotFoundError:
 #griddata_file = file_list_df[file_list_df.type=='3ds'].iloc[0].file_name
 
 def grid2xr(griddata_file, center_offset = True): 
-
+    import re
     file = griddata_file
     #####################
     # conver the given 3ds file
@@ -1407,6 +1408,37 @@ def grid2xr(griddata_file, center_offset = True):
         pass
         # (0,0) is the origin of image 
     
+
+    ############################
+    # check the XY ratio 
+    ############################
+    #    if  size_x == size_y : 
+    if  dim_px == dim_py : 
+
+        pass
+    else : 
+        print ('dim_px != dim_py')
+    # if xy size is not same, report it! 
+
+    if step_dx != step_dy :
+        xystep_ratio = step_dy/step_dx # check the XY pixel_ratio
+        X_interp = np.linspace(grid_xr.X[0], grid_xr.X[-1], grid_xr.X.shape[0]*1)
+        step_dx = step_dx # step_dx check 
+
+        Y_interp = np.linspace(grid_xr.Y[0], grid_xr.Y[-1], int(grid_xr.Y.shape[0]*xystep_ratio)) 
+        step_dy = step_dy/ xystep_ratio # step_dy check 
+
+        # interpolation ratio should be int
+        grid_xr= grid_xr.interp(X = X_interp, Y = Y_interp, method="linear")
+        print('step_dx/step_dy = ', xystep_ratio)
+        print ('grid_xr ==> reshaped')
+    else: 
+        grid_xr =grid_xr
+        print('step_dx == step_dy')
+    #print('z_LIX_fNb_xr', 'step_dx, step_dy = ',  z_LIX_fNb_xr.dims)
+    print('grid_xr', 'step_dx, step_dy = ', 
+          re.findall('\{([^}]+)', str(grid_xr.dims)))
+    # regex practice
     
     
     return grid_xr
