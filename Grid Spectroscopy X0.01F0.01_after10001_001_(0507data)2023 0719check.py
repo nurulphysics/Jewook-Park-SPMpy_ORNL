@@ -28,12 +28,13 @@
 # # Experimental Conditions 
 #
 # ## Data Acquistion date 
-# * 2023 0507 
+# * 2023 0814
 #
-# ## **Sample** :<font color= White, font size="5" > $FeTe_{0.55}Se_{0.45}$ (new batch) </font> 
-#     * Cleaving: @ UHV Loadlock chamber, Room temp.
-# ## **Tip: PtIr normal metal tip**
-# ## Measurement temp: mK (< 40 mK)
+# ## **Sample** :<font color= White, font size="5" > $CsV_{3}Sb_{5}, 4^{th}$ 82K cleaving </font> 
+#     * Cleaving at 82K at LT cleaving holder in EX chamber
+#     * UHV condition (<5E-10Torr)
+# ## **Tip: Electro chemically etched W Tip# 11  normal metal tip**
+# ## Measurement temp: mK ( $/approx$ 40 mK)
 #
 # ## Magnetic field 0 T (Z)
 # -
@@ -266,20 +267,258 @@ grid_topo = grid_xr[['topography']]
 # topography 
 grid_3D = grid_xr[['I_fb','LIX_fb']]
 # averaged I & LIX 
+
+# +
+def grid_3D_SCgap(xr_data,tolerance_I =  0.2E-11, tolerance_LIX = 1E-11, apply_SGfilter = True, bias_mV_set_zero = True):
+    '''
+    gap definition need to be improved for Superconducting sample data 
+    after Bias_mV_offset_avg_test 
+    I_avg --> I_0 = bias_mV_0 
+    
+    output : I, dI/dV, LDOS_fb, SCgap_map,SCgap_pos, SCgap_neg
+    find SCgap : based on plateau finding --> plateau map + ZBCP map 
+    
+    
+    '''
+    # get plateau area 
+    # tolerance for I & LIX
+    
+    xr_data_prcssd = xr_data.copy(deep = True)
+                   
+    xr_data_prcssd['dIdV'] = xr_data_prcssd.I_fb.differentiate(coord = 'bias_mV')
+    # numerically calculated dI/dV from I_fb
+    LIX_ratio = xr_data_prcssd.dIdV / xr_data_prcssd.LIX_fb
+       
+    xr_data_prcssd['LIX_unit_calc'] = np.abs( LIX_ratio.mean())*xr_data_prcssd.LIX_fb
+    # LIX unit calibration 
+    # pA unit : lock-in result 
+    # LIX_unit_calc : calibrated as [A/V] unit for dI/dV
+       
+    
+    print('Find plateau in I &LIX each points')
+    if apply_SGfilter == True :
+        print('import savgolFilter_xr in advance' )
+        xr_data_sg = savgolFilter_xr(xr_data_prcssd, window_length = 51, polyorder = 3)
+
+    else : 
+        print ('without SavgolFilter_xr, check outliers')
+        xr_data_sg = xr_data_prcssd
+
+    if 'I_fb' in xr_data_prcssd.data_vars : 
+        I_fb_plateau = abs(xr_data_sg['I_fb']) <= tolerance_I 
+    else :
+        I_fb_plateau = abs(xr_data_sg['LIX_fb']) <= tolerance_LIx  
+        print ('No I_fb channel, use LIX instead')
+
+    if 'LIX_unit_calc' in xr_data_prcssd.data_vars : 
+        LIX_fb_plateau = abs(xr_data_sg['LIX_unit_calc']) <= tolerance_LIX * np.abs( LIX_ratio.mean())
+    else: 
+        LIX_fb_plateau = abs(xr_data_sg['LIX_fb']) <= tolerance_LIX 
+        print ('test_ No LIX_unit_calc channel, use LIX instead for tolerance_LIX check-up')
+
+    I_LIX_plateau = I_fb_plateau*LIX_fb_plateau
+    # pixels in X,Y, bias_mV  intersection of plateau
+
+    xr_data_sg['I_LIX_plateau']=I_LIX_plateau
+    #I_LIX_plateau is where  plateau within I & LIX tolerance 
+    # I tolerance is near Zero Current 
+    # LIX tolerance is more flat area with in I tolerance area 
+    # Energy gap near Zero bias  
+    
+    
+    ################################################
+    # adjust bias_mV at zero first
+    ####################################################
+    if bias_mV_set_zero == True:
+        # select I_LIX_plateau is False ==> non-zero conductance at zero biase) 
+        # apply boolean to I_fb & areal average 
+        # find base at Zero Current 
+
+        non_zero_condunctance_avg  = xr_data_sg.I_fb.where(~xr_data_sg.I_LIX_plateau.sel(bias_mV=0, method='nearest')).mean(dim = ['X','Y'])
+        # find bias_mV value in where the close to zero current 
+        # xr_data_prcssd.bias_mV[np.abs(non_zero_condunctance_avg).argmin()]
+
+        #bias_mV_shift = grid_3D_gap.bias_mV -  grid_3D_gap.bias_mV[np.abs(non_zero_condunctance_avg).argmin()]
+        print("bias_mV zero where I_fb =0" , xr_data_sg.bias_mV[np.abs(non_zero_condunctance_avg).argmin()].values)
+        # use assign_coords to change bias_mV values 
+        xr_data_prcssd = xr_data_sg.assign_coords (bias_mV = xr_data_sg.bias_mV -  xr_data_sg.bias_mV[np.abs(non_zero_condunctance_avg).argmin()])
+        print("zero bias_mV: shifted")
+    else: pass
+    
+    
+    ##################################################
+    ### find gap position again after bias_mV adjusted 
+    #####################################################
+    
+    if 'I_fb' in xr_data_prcssd.data_vars : 
+        I_fb_plateau = abs(xr_data_prcssd['I_fb']) <= tolerance_I 
+    else :
+        I_fb_plateau = abs(xr_data_prcssd['LIX_fb']) <= tolerance_LIx  
+        print ('No I_fb channel, use LIX instead')
+
+    if 'LIX_unit_calc' in xr_data_prcssd.data_vars : 
+        LIX_fb_plateau = abs(xr_data_prcssd['LIX_unit_calc']) <= tolerance_LIX *np.abs( LIX_ratio.mean())
+    else: 
+        LIX_fb_plateau = abs(xr_data_prcssd['LIX_fb']) <= tolerance_LIX 
+        print ('No LIX_unit_calc channel, use LIX instead for tolerance_LIX check-up')
+
+    I_LIX_plateau = I_fb_plateau*LIX_fb_plateau
+    # pixels in X,Y, bias_mV  intersection of plateau
+
+    xr_data_prcssd['I_LIX_plateau'] = I_LIX_plateau
+    
+    
+    # out figure
+    gap_pos0_I = xr_data_prcssd.I_fb.where(I_LIX_plateau).idxmax(dim='bias_mV')
+    gap_neg0_I = xr_data_prcssd.I_fb.where(I_LIX_plateau).idxmin(dim='bias_mV')
+    gap_mapI = gap_pos0_I-gap_neg0_I
+    
+    
+    
+    xr_data_prcssd['gap_pos0_I'] = gap_pos0_I
+    xr_data_prcssd['gap_neg0_I'] = gap_neg0_I
+    xr_data_prcssd['gap_mapI'] = gap_mapI
+    #########
+    
+    
+    gap_pos0_LIX_mV = xr_data_prcssd.LIX_unit_calc.where(I_LIX_plateau).idxmax(dim='bias_mV')
+    gap_neg0_LIX_mV = xr_data_prcssd.LIX_unit_calc.where(I_LIX_plateau).idxmin(dim='bias_mV')
+    # I_LIX_plateau  가운데  max min 을 골라냈음. (전체가운데 0가 포함하는지는 아직 모름. 
+    
+    
+    xr_data_prcssd['gap_pos0_LIX'] = gap_pos0_LIX
+    xr_data_prcssd['gap_neg0_LIX'] = gap_neg0_LIX
+    
+    #######################################################
+    # filtering gap_pos0_LIX <--- filtering 'neg' values 
+    # filtering gap_neg0_LIX <--- filtering 'pos' values 
+    #########
+    #gap_neg0_LIX_neg = xr_data_prcssd.gap_neg0_LIX.where(xr_data_prcssd.gap_neg0_LIX>0).isnull()
+    # True ==>   neg == neg
+    gap_neg0_LIX_neg = xr_data_prcssd.gap_neg0_LIX.where(gap_neg0_LIX_mV<0)
+    xr_data_prcssd['gap_neg0_LIX']= gap_neg0_LIX_neg
+    # assign again 
+    
+    
+    #gap_pos0_LIX_pos = xr_data_prcssd.gap_pos0_LIX.where(xr_data_prcssd.gap_pos0_LIX<0).isnull()
+    # True ==>  pos == pos
+    gap_pos0_LIX_pos = xr_data_prcssd.gap_pos0_LIX.where(xr_data_prcssd.gap_pos0_LIX>0)
+    xr_data_prcssd['gap_pos0_LIX']=gap_pos0_LIX_pos
+    # assign again 
+    
+    
+    plateau_map_LIX = (~gap_pos0_LIX_pos.isnull())&(~gap_neg0_LIX_neg.isnull())
+    #     plateau_map_LIX = gap_neg0_LIX_neg & gap_pos0_LIX_pos 
+    
+    
+    # select plateau that contains ZeroBias  ---> plateau_map (zero LIX at zero bias) 
+    xr_data_prcssd['plateau_map_LIX'] = plateau_map_LIX
+    plateau_pos0_LIX = xr_data_prcssd.LIX_unit_calc.where(plateau_map_LIX).idxmax(dim='bias_mV')
+    plateau_neg0_LIX = xr_data_prcssd.LIX_unit_calc.where(plateau_map_LIX).idxmin(dim='bias_mV')
+    # LIX plateau area min & max 
+    #xr_data_prcssd['plateau_pos0_LIX'] = plateau_pos0_LIX
+    #xr_data_prcssd['plateau_neg0_LIX'] = plateau_neg0_LIX
+    
+    xr_data_prcssd['plateau_size_map_LIX'] = gap_pos0_LIX_pos-gap_neg0_LIX_neg
+    # plateau_size_map_LIX
+    xr_data_prcssd['zerobiasconductance'] = xr_data_prcssd.where(~plateau_map_LIX).LIX_unit_calc.sel(bias_mV=0, method = 'nearest')
+    # non zero LIX area zerobias conductance map 
+    
+    #gap_map_LIX = gap_pos0_LIX.where(grid_3D_gap.gap_neg0_LIX>0) - gap_neg0_LIX.where(grid_3D_gap.gap_neg0_LIX<0)
+    
+    ###############################################
+    # in case of  LIX offset (due to phase mismatching?) 
+    """
+    # LIX_fb values less than LIX_min_A => zero value 
+    # LIX_0_pA = LIX_0_pA
+    LIX_0_AV  =  LIX_0_pA * LIX_ratio.mean()
+    # calibrated LIX resolution limit
+    gap_mask_LIX  = np.abs(grid_3D.LIX_unit_calc) < LIX_0_AV
+    # gap_mask_LIX  = np.abs(grid_3D.LIX_fb) > LIX_0_pA
+    # because of the same coefficient ('LIX_ratio.mean()')
+    # range for CBM &VBM is not different between  LIX_unit_calc & LIX_fb
+    # 3D mask 
+
+    LIX_unit_calc_offst = grid_3D.dIdV.where(gap_mask_I).mean()- grid_3D['LIX_unit_calc'].where(gap_mask_I).mean()
+    # possible LIX offset adjust (based on dI/dV calc value)
+    grid_3D_prcssd['LDOS_fb'] = grid_3D.LIX_unit_calc + LIX_unit_calc_offst
+    # assign dI/dV value at I=0  as a reference offset 
+    # grid_3D['LDOS_fb'] is calibrated dIdV with correct unit ([A/V]) for LDOS 
+    # LDOS_fb is proportional to the real LDOS
+    # here we dont consider the matrix element for
+    """
+    
+    #xr_data_prcssd = xr_data_prcssd.drop('gap_pos0_LIX')
+    #xr_data_prcssd = xr_data_prcssd.drop('gap_neg0_LIX')
+    
+    xr_data_prcssd.attrs['I[A]_limit'] = tolerance_I
+    xr_data_prcssd.attrs['LDOS[A/V]_limit'] = tolerance_LIX
+    xr_data_prcssd['LDOS_fb'] = xr_data_prcssd['LIX_unit_calc']
+    # meaningless redundant channel name. 
+    # save the LDOS_fb for other functions. 
+    
+    
+    return xr_data_prcssd
+
+#test
+#grid_3D_gap = grid_3D_Gap(grid_3D)
+#grid_3D_gap
+# -
+grid_3D_gap = grid_3D_SCgap(grid_3D)
+grid_3D_gap#.plateau_size_map_LIX.plot()
+
+grid_3D_gap.zerobiasconductance.plot()
+
+# +
+
+#grid_3D_gap.gap_mapI.where(grid_3D_gap.gap_mapI<0).notnull().sum()
+grid_3D_gap.gap_pos0_I.plot()
+#(grid_3D_gap.gap_pos0_LIX-grid_3D_gap.gap_neg0_LIX).plot()
+#grid_3D_gap.gap_neg0_I.plot()
+#grid_3D_gap.plateau_size_map_LIX.plot()
+#grid_3D_gap.zerobiasconductance.plot()
+#grid_3D_gap.plateau_map_LIX.plot()
+
+
 # -
 
-##
-# find neares I =0 bias_mV 
-def Bias_mV_offset_test(grid_3D):
-    I_fb_avg_df = grid_3D.I_fb.mean (dim = ['X','Y']).to_dataframe().abs()
-    if I_fb_avg_df.I_fb.idxmin() == 0:
-        print ('Bias_mV is set to I = 0')
-    else:
-        print ('need to adjust Bias_mV Zero')
-        grid_3D = grid_3D.assign_coords(bias_mV= (  grid_3D.bias_mV - I_fb_avg_df.I_fb.idxmin()  ))
-        print ('Bias_mV Zero shifted : '+ str( round(I_fb_avg_df.I_fb.idxmin(),2)  ))
-    return grid_3D
+# ### for some files Bias mV zero adjustment is not working 
+# * use the point by point adjustments? 
+# * No.. the thing is this is because of zero bias gap. 
+# * nearest zero point is not actual Z shift. 
+# * It was realted to the SC gap. 
+#
+# * $\to $  we need to filtering gapped area first. 
+# $\to $   adjust the Z shift avg value after 
+#
 
+
+
+# +
+# abs 로 만들어서 min 찾기 --> 0 에 가장 가까운 값 찾기 
+## 그러나 만들어낸 값이 실제 0 shift는 아닌 것 같다. monotonic increase가 아니기 때문. 
+## I-V  curve의 0  근처의 zero bias 는 gap 이 있을경우 정확하지 않다. 
+## gap 이 없는 경우만 맞춰야함. 
+## plateau는 기준에서 제외하고. linear 한 부분들만 기준 삼아서 shift 해야함. 
+
+
+## 3D_SCgap을 먼저 돌리고 filtering된 부분을 기준으로 재시도 할것. 
+
+
+#np.abs(grid_3D_gap.I_fb).argmin(dim ="bias_mV").plot()
+
+# -
+
+
+
+#grid_3D_gap.gap_neg0_LIX.plot()
+grid_3D_gap.plateau_size_map_LIX.plot()#.sel(bias_mV=0).plot()
+# plateau 영역 extract
+
+
+# +
+#grid_3D_gap.zerobiasconductance.plot()
+# -
 
 #grid_3D = Bias_mV_offset_test(grid_3D)
 grid_3D = Bias_mV_offset_test(grid_3D)
@@ -964,6 +1203,7 @@ plt.show()
 #
 #
 
+# + [markdown] jp-MarkdownHeadingCollapsed=true
 # ## 2.0. # use Grid_LDOS
 
 # +
@@ -1423,3 +1663,8 @@ grid_LDOS_rot
 # -
 
 np.save('LDOS008_001_pk_zm_mV.npy', grid_LDOS_rot.LDOS_pk_mV.where((grid_LDOS_rot.bias_mV> - 3.6)& (grid_LDOS_rot.bias_mV<3.6), drop = True).to_numpy())
+
+# #  <font color= orange > 3. zero bias map analysis (for MZM) </font>
+#
+
+

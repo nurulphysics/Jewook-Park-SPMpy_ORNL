@@ -1952,7 +1952,7 @@ def line_profile_xr_GUI(xrdata, ch_N = 0, profile_width = 3):
     for ch_i, ch_name in enumerate(xrdata):
         if ch_i == ch_N :  #  use the first channel image
             fig,axs = plt.subplots (nrows=1,ncols=1, figsize = (6,6))
-            isns.imshow(xrdata[ch_name].values,ax = axs, robust=True, origin ="lower")
+            isns.imshow(xrdata[ch_name].values,ax = axs, robust=True, origin ="lower", cmap ='copper')
             l_pf_point_2 = fig.ginput(2) 
             # tuple of 2 points 
             plt.show()
@@ -1988,7 +1988,7 @@ def line_profile_xr_GUI(xrdata, ch_N = 0, profile_width = 3):
     isns.imshow(xrdata[ch_name_to_show].values,
                 robust=True,
                 origin ="lower",
-                ax = axs[0])
+                ax = axs[0], cmap ='copper')
     axs[0].arrow(l_pf_start[0],
                  l_pf_start[1],
                  l_pf_end[0]-l_pf_start[0],
@@ -1999,11 +1999,11 @@ def line_profile_xr_GUI(xrdata, ch_N = 0, profile_width = 3):
         xy=(0, 1+0.1), xycoords='axes fraction',
         horizontalalignment='left', verticalalignment='top',
         fontsize='medium')
-    
+    '''
     if scan_aspect_ratio != 1: 
         fig.colorbar(isns_channels.get_children()[-2],  
                     fraction = 0.045, 
-                    ax = axs[ch_i]) 
+                    ax = axs[ch_i]) '''
     axs[1].plot(np.linspace(0,
                             l_pf_length, 
                             len(l_pf)
@@ -2096,7 +2096,7 @@ def line_profile_xr(xrdata, l_pf_start, l_pf_end, ch_N = 0, profile_width = 3):
                  l_pf_end[0]-l_pf_start[0],
                  l_pf_end[1]-l_pf_start[1],
                  width = 2,
-                 color = 'red')
+                 color = 'copper')
     axs[0].annotate(xrdata.title,
         xy=(0, 1+0.1), xycoords='axes fraction',
         horizontalalignment='left', verticalalignment='top',
@@ -2237,10 +2237,11 @@ def line_profile2_xr_GUI(xrdata, ch_N = [0,2], profile_width = 3):
         xy=(0, 1+0.1), xycoords='axes fraction',
         horizontalalignment='left', verticalalignment='top',
         fontsize='medium')
+    '''
     if scan_aspect_ratio != 1: 
         fig1.colorbar(isns_channels.get_children()[-2],  
                     fraction = 0.045, 
-                    ax = axs[ch_i]) 
+                    ax = axs[ch_i]) '''
     # image =  0 :( ==> xrdata[ch_names_for_lp[0]]  )
     isns.imshow(xrdata[ch_names_for_lp[1]].values,
                 robust=True,
@@ -2258,10 +2259,11 @@ def line_profile2_xr_GUI(xrdata, ch_N = [0,2], profile_width = 3):
         xy=(0, 1+0.1), xycoords='axes fraction',
         horizontalalignment='left', verticalalignment='top',
         fontsize='medium')
+    '''
     if scan_aspect_ratio != 1: 
         fig1.colorbar(isns_channels.get_children()[-2],  
                     fraction = 0.045, 
-                    ax = axs[ch_i]) 
+                    ax = axs[ch_i]) '''
     fig1.suptitle(xrdata.title,
                   fontsize = 'small',
                   position=(0.5, 1.0+0.001) )
@@ -3405,7 +3407,6 @@ def rotate_2D_xr (xrdata, rotation_angle):
 #
 # * 
 
-# +
 def drift_compensation_y_topo_crrltn (xr_data_topo, y_sub_n=5, drift_interpl_method='nearest'): 
     y_N = len (xr_data_topo.Y)
     y_sub_n = y_sub_n
@@ -3471,5 +3472,71 @@ def drift_compensation_y_topo_crrltn (xr_data_topo, y_sub_n=5, drift_interpl_met
     xr_data_topo_offset.topography.plot(ax =axs[1])
     plt.show()
     return xr_data_topo_offset
+
+
+
+# +
+# kde plot gaussian fitting multi peak cases 
+# code from bing chat 
+
+# +
+#######################################
+## Generated code from the bing chat!
+########################################
+
+# input_pd : 2 column pandas dataframe 
+
+
+def multi4gaussian_fit_pd (pd_df, guess = [1E9, -0.3E-10, 1E-10,
+         1E9, -0.1E-10, 1E-10, 
+         1E9, 0.1E-10, 1E-10,
+         1E9, 0.4E-10, 1E-10, 
+         0]):
+    '''
+    # input_pd : 2 column pandas dataframe 
+    # guess  :
+    # Initial guesses for the parameters to fit: 4 amplitudes, means and standard deviations plus a continuum offset.
+    '''
+    # gauss
+
+
+
+    from scipy.optimize import curve_fit
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    def gaussian(x, A, x0, sig):
+        return A*np.exp(-(x-x0)**2/(2*sig**2))
+
+    def multi_gaussian(x, *pars):
+        offset = pars[-1]
+        g1 = gaussian(x, pars[0], pars[1], pars[2])
+        g2 = gaussian(x, pars[3], pars[4], pars[5])
+        g3 = gaussian(x, pars[6], pars[7], pars[8])
+        g4 = gaussian(x, pars[9], pars[10], pars[11])
+        return g1 + g2 + g3 + g4 + offset
+
+    vel, flux = pd_df.iloc[:,0],  pd_df.iloc[:,1]
+
+    # Initial guesses for the parameters to fit: 4 amplitudes, means and standard deviations plus a continuum offset.
+    guess = [1E9, -0.3E-10, 1E-10,
+             1E9, -0.1E-10, 1E-10, 
+             1E9, 0.1E-10, 1E-10,
+             1E9, 0.4E-10, 1E-10, 
+             0]
+
+    popt, pcov = curve_fit(multi_gaussian, vel, flux, guess)
+    fig,axs = plt.subplots(figsize = (4,3))
+    sns.lineplot(x=vel, y=flux, ax= axs)
+    sns.lineplot(x=vel, y=multi_gaussian(vel, *popt), label='Fit', ax= axs )
+    sns.lineplot(x=vel, y=gaussian(vel,popt[0],popt[1],popt[2]),label='Gaussian 1', ax= axs)
+    sns.lineplot(x=vel, y=gaussian(vel,popt[3],popt[4],popt[5]), label='Gaussian 2', ax= axs)
+    sns.lineplot(x=vel, y=gaussian(vel,popt[6],popt[7],popt[8]),label='Gaussian 3', ax= axs)
+    sns.lineplot(x=vel, y=gaussian(vel,popt[9],popt[10],popt[11]),label='Gaussian 4', ax= axs)
+    axs.legend()
+    plt.show()
+
+    return popt, pcov, fig
+
 
 
