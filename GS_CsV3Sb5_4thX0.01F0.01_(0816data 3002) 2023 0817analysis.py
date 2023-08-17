@@ -247,7 +247,7 @@ files_df[files_df.type=='3ds']#.file_name.iloc[0]
 # 3D data 
 #grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[2])
 # line data
-grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[2])
+grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[6])
 grid_xr
 
 # ## 1-2.2. Separate topography / gird_3D (I_fb, LIX_fb)
@@ -267,6 +267,21 @@ grid_topo = grid_xr[['topography']]
 # topography 
 grid_3D = grid_xr[['I_fb','LIX_fb']]
 # averaged I & LIX 
+# -
+
+grid_xr
+
+# +
+###########################
+# unfinished grid data 
+###########################
+# Crop  (Y<1.25E-9)
+#############################
+
+#grid_topo = grid_topo.where (grid_topo.Y<1.25E-9, drop = True)
+#grid_3D = grid_3D.where (grid_3D.Y<1.25E-9, drop = True)
+
+
 
 # +
 def grid_3D_SCgap(xr_data,tolerance_I =  0.2E-11, tolerance_LIX = 1E-11, apply_SGfilter = True, bias_mV_set_zero = True):
@@ -543,7 +558,7 @@ grid_LDOS
 
 # +
 grid_topo = grid_xr[['topography']]
-grid_topo =  plane_fit_y_xr(grid_topo)
+grid_topo =  plane_fit_y_xr(grid_topo.where(grid_topo.Y<1.25E-9))
 #isns.imshow(plane_fit_y_xr(grid_topo).where(grid_topo.Y < 0.7E-9, drop=True).topography)
 
 #grid_topo = grid_topo.drop('gap_map_I').drop('gap_map_LIX')
@@ -893,7 +908,8 @@ plt.show()
 #bias_mV_slices= [ -2.4, -2, -1, 0, 1, 2, 2.4 ][::-1]
 
 #bias_mV_slices= [-1.4, -1.2, -1, -0.8, -0.6, 0, 0.6, 0.8,1,1.2,1.4][::-1]
-bias_mV_slices= [-1.0, -0.8, -0.6,-0.4,-0.2, 0,0.2,0.4, 0.6, 0.8,1][::-1]
+#bias_mV_slices= [-1.0, -0.8, -0.6,-0.4,-0.2, 0,0.2,0.4, 0.6, 0.8,1][::-1]
+bias_mV_slices= [ -0.8, -0.6,-0.4,-0.2, 0,0.2,0.4, 0.6, 0.8][::-1]
 
 bias_mV_slices_v = grid_LDOS.bias_mV.sel(bias_mV = bias_mV_slices, method = "nearest").values#.round(2)
 bias_mV_slices_v
@@ -907,9 +923,9 @@ grid_LDOS
 
 
 g = isns.ImageGrid(grid_LDOS.sel(bias_mV = bias_mV_slices, method = "nearest").LDOS_fb.values, 
-                   cbar=False, height=2, col_wrap=4,  cmap="bwr", robust = True)
+                   cbar=False, height=2, col_wrap=5,  cmap="bwr", robust = True)
 
-col_wrap=4
+col_wrap=5
 # set a col_wrap for suptitle 
 
 for axes_i  in range( len(bias_mV_slices)):
@@ -1279,19 +1295,19 @@ grid_LDOS_bbox_pk = grid3D_line_avg_pks(grid_LDOS_bbox)
 grid_LDOS_bbox_pk  = grid3D_line_avg_pks( grid_LDOS_bbox ,
                                          ch_l_name ='LDOS_fb',
                                          average_in= average_in,
-                                         distance = 5, 
-                                         width= 8,
-                                         threshold = 0.1E-11, 
+                                         distance = 8, 
+                                         width= 9,
+                                         threshold = 2E-11, 
                                          padding_value= 0,
-                                         prominence=0.4E-11
+                                         prominence=2E-11
                                         ) 
 grid_LDOS_bbox_pk
 
 grid_LDOS_bbox_pk_slct, grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df, fig = grid_lineNpks_offset(
     grid_LDOS_bbox_pk,
     ch_l_name ='LDOS_fb',
-    plot_y_offset= 5E-11,
-    peak_LIX_min = 0.4E-11,
+    plot_y_offset= 20E-11,
+    peak_LIX_min = 2E-11,
     legend_title = "Y (nm)")
 
 plt.show()
@@ -1299,30 +1315,45 @@ plt.show()
 # +
 grid_LDOS_bbox_pk_df
 
+#################
+##  Classify peaks by using k-mean clustering 
+####################
 
 from sklearn.cluster import KMeans
 
 X = grid_LDOS_bbox_pk_df[['bias_mV', 'LDOS_fb_offset']].values
 
-kmeans = KMeans(n_clusters=6)
+kmeans = KMeans(n_clusters=11)
 kmeans.fit(X)
 
 y_kmeans = kmeans.predict(X)
 grid_LDOS_bbox_pk_df['y_kmeans']=y_kmeans
-grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  == 2)|(grid_LDOS_bbox_pk_df.y_kmeans  == 3)]
 
 grid_LDOS_bbox_pk_df_choose
-#plt.scatter(X[:, 0], X[:, 1], c=y_kmeans, s=50, cmap='viridis')
-#plt.show()
+plt.scatter(X[:, 0], X[:, 1], c=y_kmeans, s=50, cmap='viridis')
+plt.show()
 # -
 
-y_kmeans
+grid_LDOS_bbox_pk_df
+sns.color_palette("tab10")
+sns.scatterplot( data  = grid_LDOS_bbox_pk_df, x = 'bias_mV', y = 'LDOS_fb_offset', hue = y_kmeans, palette='deep' , legend ='full')
+plt.show()
+
+# +
+# y_kmeans
 
 # +
 ##############
 # Fig plot again (remove 0th peak points) 
 
 #grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df
+
+
+#############
+# Choose peak labels
+###############
+grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==1) |(grid_LDOS_bbox_pk_df.y_kmeans  == 3)]
+
 
 ##########
 #grid_LDOS_bbox_pk_df =  grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.bias_mV<=8]
@@ -1343,7 +1374,7 @@ sns.lineplot(data = grid_LDOS_bbox_df,
 sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
                         x ='bias_mV',
                         y = ch_l_name+'_offset',
-                        s = 20,
+                        #s = 20,
                         palette ="rocket",
                         hue = xr_data_l_pks.line_direction,
                 
@@ -1352,7 +1383,7 @@ sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
 ax.set_xlabel('Bias (mV)')   
 #ax.set_ylabel(ch_l_name+'_offset')   
 ax.set_ylabel('LDOS')   
-ax.set_xlim(-1.8,1.8)
+ax.set_xlim(-1.0,1.0)
 #ax.set_ylim(-1.0E-9,6.0E-9)
 
 ax.vlines(x = 0, ymin=ax.get_ylim()[0],  ymax=ax.get_ylim()[1], linestyles='dashed',alpha = 0.5, color= 'k')
@@ -1764,14 +1795,8 @@ def rotate_3D_fft_xr (xrdata, rotation_angle):
 # * average_in = 'X' or 'Y'
 # * ch_l_name = channel name for line profile  
 
-rotate_3D_fft_xr(grid_LDOS_fft, 60).LDOS_fb_fft.sel(freq_bias_mV = 0, method ='nearest').plot(re)
+grid_LDOS_fft_rot =  rotate_3D_fft_xr(grid_LDOS_fft, 120)
 
-# +
-grid_LDOS_fft
-# peak detection 
-
-
-# -
 
 def hv_fft_bias_mV_slicing(xr_data,ch = 'LDOS_fb_fft',frame_width = 200,cmap = 'bwr'): 
     '''
@@ -1809,7 +1834,7 @@ def hv_fft_bias_mV_slicing(xr_data,ch = 'LDOS_fb_fft',frame_width = 200,cmap = '
     return dmap   
 
 
-hv_fft_bias_mV_slicing(np.log(grid_LDOS_fft), ch = 'LDOS_fb_fft',frame_width=300)
+hv_fft_bias_mV_slicing(np.log(grid_LDOS_fft_rot), ch = 'LDOS_fb_fft',frame_width=300)
 
 
 def hv_fft_XY_slicing(xr_data,ch = 'LDOS_fb_fft', slicing= 'X', frame_width = 200,cmap = 'bwr'): 
@@ -1873,7 +1898,7 @@ import holoviews as hv
 from holoviews import opts
 hv.extension('bokeh')
 
-xr_data = np.log(grid_LDOS_fft)
+xr_data = np.log(grid_LDOS_fft_rot)
 ch = 'LDOS_fb_fft'
 frame_width = 400
 
@@ -1971,7 +1996,7 @@ def hv_fft_bbox_crop (xr_data, bound_box , ch = 'LDOS_fb_fft' ,slicing_bias_mV =
     return xr_data_bbox
 
 
-grid_LDOS_fft_bbox = hv_fft_bbox_crop(grid_LDOS_fft, bound_box_fft)
+grid_LDOS_fft_bbox = hv_fft_bbox_crop(grid_LDOS_fft_rot, bound_box_fft)
 
 np.log(grid_LDOS_fft_bbox.mean(dim = "freq_Y").LDOS_fb_fft).T.plot(robust = True)
 
