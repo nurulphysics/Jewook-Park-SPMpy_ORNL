@@ -942,8 +942,7 @@ isns.imshow(z_LIX_fNb_xr_butterworth.z_fwd_df_butterworth, origin = "lower")
 '''
 
 
-# -
-
+# + [markdown] jp-MarkdownHeadingCollapsed=true
 # # 5. rank filteres functions 
 # > To use "skimage.filters.rank ", input data type should be uint8/uint16
 # > * $\to$ image_to_grayscale (convert image as (0,255))
@@ -962,32 +961,6 @@ isns.imshow(z_LIX_fNb_xr_butterworth.z_fwd_df_butterworth, origin = "lower")
 # >* eg) xrdata =  **filter_convert2grayscale** (xrdata)
 # >* eg) xrdata =  **filter_gs_mean_xr** (xrdata_gs)
 # >* eg) xrdata =  **filter_gs_substract_mean_xr** (xrdata)
-#
-
-# # 6. Image Thresholding functions 
-# > *  Threshold selections + boolean 
-# > * threshold_flip = True : boolean T/F selection
-# * single threshold values
-#     * __threshold_mean_xr__
-#     * __threshold_otsu_xr__
-#     * __threshold_minimum_xr__
-#         * Return threshold value(s) to have __only two peaks__ in the histogram
-#     * ~~threshold_li_xr ($\to$ it takes long time to compute)~~
-#     * threshold_triangle_xr
-#     * threshold_yen_xr
-#         * threshold to distinguish areas
-#         * Return threshold value based on Yen’s method.
-#     * threshold_isodata_xr
-#         * Return threshold value(s) based on ISODATA method
-#     * __threshold_multiotsu_xr__     
-#         * multi threshold values  (using minimum_v in histogram, class number default = 3)
-# * array threshold values 
-#     * threshold_sauvola_xr (window_size_odd = 15, k =0.2)
-#     * __threshold_local_xr__ (blocksize_odd = 15) 
-#
-# * check the reference functions in scikit image
-#     * https://scikit-image.org/docs/stable/auto_examples/applications/plot_thresholding.html#sphx-glr-auto-examples-applications-plot-thresholding-py
-#     * https://scikit-image.org/docs/stable/api/skimage.filters.html#skimage.filters.try_all_threshold
 #
 
 # + id="po4Jm_loJfhb"
@@ -1063,7 +1036,7 @@ def filter_gs_mean_xr(xrdata_gs,disk_radious=10):
     xrdata_gs_prcssd = xrdata_gs.copy()
     for ch_name in  xrdata_gs:
         xrdata_gs_prcssd[ch_name].values =  skimage.filters.rank.mean(
-            xrdata_gs[ch_name],skimage.draw.disk(disk_radious))
+            xrdata_gs[ch_name],disk(disk_radious))
     return xrdata_gs_prcssd
 #############################################
 
@@ -1099,6 +1072,33 @@ def filter_gs_substract_mean_xr (xrdata_gs,disk_radious=10):
     return xrdata_gs_sub_mean
 
 # test
+# -
+
+# # 6. Image Thresholding functions 
+# > *  Threshold selections + boolean 
+# > * threshold_flip = True : boolean T/F selection
+# * single threshold values
+#     * __threshold_mean_xr__
+#     * __threshold_otsu_xr__
+#     * __threshold_minimum_xr__
+#         * Return threshold value(s) to have __only two peaks__ in the histogram
+#     * ~~threshold_li_xr ($\to$ it takes long time to compute)~~
+#     * threshold_triangle_xr
+#     * threshold_yen_xr
+#         * threshold to distinguish areas
+#         * Return threshold value based on Yen’s method.
+#     * threshold_isodata_xr
+#         * Return threshold value(s) based on ISODATA method
+#     * __threshold_multiotsu_xr__     
+#         * multi threshold values  (using minimum_v in histogram, class number default = 3)
+# * array threshold values 
+#     * threshold_sauvola_xr (window_size_odd = 15, k =0.2)
+#     * __threshold_local_xr__ (blocksize_odd = 15) 
+#
+# * check the reference functions in scikit image
+#     * https://scikit-image.org/docs/stable/auto_examples/applications/plot_thresholding.html#sphx-glr-auto-examples-applications-plot-thresholding-py
+#     * https://scikit-image.org/docs/stable/api/skimage.filters.html#skimage.filters.try_all_threshold
+#
 
 # +
 ###############################

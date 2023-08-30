@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.14.5
+#       jupytext_version: 1.15.0
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -235,7 +235,9 @@ def grid_3D_Gap(grid_3D, I_0_pA = 1E-13 ,LIX_0_pA = 1E-14):
 #grid_3D_gap = grid_3D_Gap(grid_3D)
 #grid_3D_gap
 # +
-def grid_3D_SCgap(xr_data,tolerance_I =  0.2E-11, tolerance_LIX = 1E-11, apply_SGfilter = True, bias_mV_set_zero = True):
+def grid_3D_SCgap(xr_data,tolerance_I =  0.2E-11, tolerance_LIX = 1E-11,
+                  apply_SGfilter = True,  window_length = 21, polyorder = 3, 
+                  bias_mV_set_zero = True):
     '''
     gap definition need to be improved for Superconducting sample data 
     after Bias_mV_offset_avg_test 
@@ -251,11 +253,13 @@ def grid_3D_SCgap(xr_data,tolerance_I =  0.2E-11, tolerance_LIX = 1E-11, apply_S
     
     xr_data_prcssd = xr_data.copy(deep = True)
                    
-    xr_data_prcssd['dIdV'] = xr_data_prcssd.I_fb.differentiate(coord = 'bias_mV')
+    xr_data_prcssd['dIdV'] = xr_data_prcssd.I_fb.differentiate(
+        coord = 'bias_mV')
     # numerically calculated dI/dV from I_fb
     LIX_ratio = xr_data_prcssd.dIdV / xr_data_prcssd.LIX_fb
        
-    xr_data_prcssd['LIX_unit_calc'] = np.abs( LIX_ratio.mean())*xr_data_prcssd.LIX_fb
+    xr_data_prcssd['LIX_unit_calc'] = np.abs(
+        LIX_ratio.mean())*xr_data_prcssd.LIX_fb
     # LIX unit calibration 
     # pA unit : lock-in result 
     # LIX_unit_calc : calibrated as [A/V] unit for dI/dV
@@ -264,7 +268,9 @@ def grid_3D_SCgap(xr_data,tolerance_I =  0.2E-11, tolerance_LIX = 1E-11, apply_S
     print('Find plateau in I &LIX each points')
     if apply_SGfilter == True :
         print('import savgolFilter_xr in advance' )
-        xr_data_sg = savgolFilter_xr(xr_data_prcssd, window_length = 51, polyorder = 3)
+        xr_data_sg = savgolFilter_xr(xr_data_prcssd, 
+                                     window_length = window_length,
+                                     polyorder = polyorder)
 
     else : 
         print ('without SavgolFilter_xr, check outliers')
@@ -905,7 +911,7 @@ def hv_bbox_topo_avg (xr_data, bound_box , ch = 'topography' ):
     xr_data_bbox = xr_data.where (xr_data.X[x_bounds_msk] + xr_data.Y[y_bounds_msk])
     
     isns.reset_defaults()
-    isns.set_image(origin = 'lower')
+    isns.set_image(cmap="inferno",origin = 'lower')
     # isns image directino setting 
 
     fig,axs = plt.subplots (nrows = 1,
@@ -1007,8 +1013,8 @@ def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
 
     xr_data_bbox = xr_data.where (xr_data.X[x_bounds_msk] + xr_data.Y[y_bounds_msk])
     
-    isns.reset_defaults()
-    isns.set_image(origin = 'lower')
+    #isns.reset_defaults()
+    #isns.set_image(origin = 'lower')
     # isns image directino setting 
 
     fig,axs = plt.subplots (nrows = 1,
@@ -1036,7 +1042,7 @@ def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
                                edgecolor = 'pink',
                                fill=False,
                                lw=2,
-                               alpha=0.5))
+                               alpha=1))
 
     isns.imshow(xr_data_bbox[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
                 ax =  axs[1],
@@ -1075,41 +1081,47 @@ def savgolFilter_xr(xrdata,window_length=7,polyorder=3):
     for data_ch in xrdata:
 
         if len(xrdata[data_ch].dims) == 2:
-            print('3D data')
-            # smoothing filter only for the 3D data set
-            # ==> updaded 
-            xrdata_prcssd[data_ch]
-            ### 2D data case 
-            ### assume that coords are 'X','Y','bias_mV'
-            #### two case X,bias_mV or Y,bias_mV 
-            if 'X' in xrdata[data_ch].dims :
-                x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
-                # xrdata is X,bias_mV 
-                # use the isel(X = x) 
-                xrdata_prcssd[data_ch] = xr.DataArray (
-                    np.array (
-                        [sp.signal.savgol_filter(xrdata[data_ch].isel(X = x).values,
-                                                 window_length, 
-                                                 polyorder , 
-                                                 mode = 'nearest')
-                         for x in range(x_axis)]),
-                    dims = ["X", "bias_mV"],
-                    coords = {"X": xrdata.X,
-                              "bias_mV": xrdata.bias_mV})
-            elif 'Y' in xrdata[data_ch].dims  :                # xrdata is XY,bias_mV                 # use the isel(Y = y) 
-                y_axis = xrdata.Y.size
-                xrdata_prcssd[data_ch] = xr.DataArray (
-                    np.array (
-                        [sp.signal.savgol_filter(xrdata[data_ch].isel(Y = y).values,
-                                                 window_length, 
-                                                 polyorder , 
-                                                 mode = 'nearest')
-                         for y in range(y_axis) ]),
-                    dims = ["Y", "bias_mV"],
-                    coords = {"Y": xrdata.Y,
-                              "bias_mV": xrdata.bias_mV}
-                )
-            else: pass
+            
+            if xrdata[data_ch].dims == ('Y', 'X'):
+                print('3D data')
+                pass
+                
+            else: # in case of X& bias_mV or Y  & bias_mV case
+
+                # smoothing filter only for the 3D data set
+                # ==> updaded 
+                xrdata_prcssd[data_ch]
+                ### 2D data case 
+                ### assume that coords are 'X','Y','bias_mV'
+                #### two case X,bias_mV or Y,bias_mV 
+                if 'X' in xrdata[data_ch].dims :
+                    x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
+                    # xrdata is X,bias_mV 
+                    # use the isel(X = x) 
+                    xrdata_prcssd[data_ch] = xr.DataArray (
+                        np.array (
+                            [sp.signal.savgol_filter(xrdata[data_ch].isel(X = x).values,
+                                                     window_length, 
+                                                     polyorder , 
+                                                     mode = 'nearest')
+                             for x in range(x_axis)]),
+                        dims = ["X", "bias_mV"],
+                        coords = {"X": xrdata.X,
+                                  "bias_mV": xrdata.bias_mV})
+                elif 'Y' in xrdata[data_ch].dims  :                # xrdata is XY,bias_mV                 # use the isel(Y = y) 
+                    y_axis = xrdata.Y.size
+                    xrdata_prcssd[data_ch] = xr.DataArray (
+                        np.array (
+                            [sp.signal.savgol_filter(xrdata[data_ch].isel(Y = y).values,
+                                                     window_length, 
+                                                     polyorder , 
+                                                     mode = 'nearest')
+                             for y in range(y_axis) ]),
+                        dims = ["Y", "bias_mV"],
+                        coords = {"Y": xrdata.Y,
+                                  "bias_mV": xrdata.bias_mV}
+                    )
+                else: pass
             
         elif len(xrdata[data_ch].dims) == 3:
             x_axis = xrdata.X.size # or xrdata.dims.mapping['X']
@@ -2192,13 +2204,89 @@ def  grid_lineNpks_offset(xr_data_l_pks,
 # not fully 
 # -
 
-def drift_compensation_y_topo_crrltn (xr_data_topo, y_sub_n=5, drift_interpl_method='nearest'): 
+def padding_xr (xrdata, padding_dim = 'X', padding_shape =5, padding_value = np.nan): 
+    '''
+    Input: 
+    xrdata : use padding result only for XY
+    convert XY coord accordingly 
+    padding_value : filling value, can be other constant, update if needed.
+    
+    Output:  padding result 
+    '''
+    
+    # padding 
+
+    # padding amount:  padding_shape 
+    padding_shape = padding_shape 
+    
+    # front side append for X dimension 
+    X_pad  = np.append (
+        np.append(
+            (np.arange(1,padding_shape+1,1)[::-1]* -xrdata.X_spacing)
+            - xrdata.X.min().values , 
+            xrdata.X ), 
+        (np.arange(1,padding_shape+1,1)* xrdata.X_spacing)
+        + xrdata.X.max().values)
+    Y_pad  = np.append (
+        np.append(
+            (np.arange(1,padding_shape+1,1)[::-1]* -xrdata.Y_spacing)
+            - xrdata.Y.min().values , 
+            xrdata.Y ), 
+        (np.arange(1,padding_shape+1,1)* xrdata.Y_spacing)
+        + xrdata.Y.max().values)
+        # np.arange start from 1 & end with +1 to match existing X arange min & max)
+    # or we will see iterated min & max values 
+    # use append function twice for front & back side 
+
+    
+    if padding_dim == 'X': 
+    
+        # front side append for X dimension 
+        xrdata_pad = xrdata.pad(X=(padding_shape,padding_shape), constant_values = np.nan)
+        xrdata_pad = xrdata_pad.assign_coords(X = X_pad)
+    elif padding_dim == 'Y':
+        # Y_pad only     
+        xrdata_pad = xrdata.pad(Y=(padding_shape,padding_shape),constant_values = np.nan)
+        xrdata_pad = xrdata_pad.assign_coords(Y = Y_pad)
+    
+    elif padding_dim == 'XY':
+        xrdata_pad = xrdata.pad(X=(padding_shape,padding_shape), Y=(padding_shape,padding_shape),constant_values = np.nan)
+        xrdata_pad = xrdata_pad.assign_coords(X = X_pad)
+        xrdata_pad = xrdata_pad.assign_coords(Y = Y_pad)
+    else: 
+        print("choose padding_dim = 'X', 'Y', or 'XY'")
+        
+    return xrdata_pad
+
+
+def drift_compensation_y_topo_crrltn (xr_data, y_sub_n=10, padding_shape = 10, drift_interpl_method='nearest'): 
+    '''
+    input: xr 3D data 
+    use grid_xr.topography to calculate Y drift with drift 
+    
+    use padding_xr function with padding_dims= 'X' only
+    
+    output: Xr 3D data + padding 
+    
+    
+    '''
+    xr_data_topo = xr_data.topography
+    xr_data_topo.attrs = xr_data.attrs
+    xr_data_pad = padding_xr(xr_data, padding_dim = 'X', padding_shape= padding_shape)
+
     y_N = len (xr_data_topo.Y)
+
     y_sub_n = y_sub_n
+    drift_interpl_method='nearest'
+
+    # use xr_data for correlation search 
+    # apply the correlation shift to the pad results 
+
+
     #y_j = 0 
     offset = np.array([0, y_N//2])
     # use for loop 
-    print ('only for topo, 2D data, apply to 3D data & other channels later ')
+    print ('drift check with for topography channel(2D data), apply to 3D data')
     for y_j  in range (len (xr_data_topo.Y)//y_sub_n - 1) :
         y_N = len (xr_data_topo.Y)
         #print (y_j)
@@ -2209,8 +2297,8 @@ def drift_compensation_y_topo_crrltn (xr_data_topo, y_sub_n=5, drift_interpl_met
         #print (Y_sub_n0, Y_sub_n1, Y_sub_n2)
         # check Y drift comparision area 
         # use y_sub_n = 5 ==> 0-5, 6-10, 10-5, ... 
-        line0 = xr_data_topo.where(xr_data_topo.Y >= Y_sub_n0, drop = True).where (xr_data_topo.Y < Y_sub_n1, drop = True ).topography
-        line1 = xr_data_topo.where(xr_data_topo.Y >=  Y_sub_n1, drop = True).where (xr_data_topo.Y <  Y_sub_n2, drop = True ).topography
+        line0 = xr_data_topo.where(xr_data_topo.Y >= Y_sub_n0, drop = True).where (xr_data_topo.Y < Y_sub_n1, drop = True )
+        line1 = xr_data_topo.where(xr_data_topo.Y >=  Y_sub_n1, drop = True).where (xr_data_topo.Y <  Y_sub_n2, drop = True )
         # select two region for correlation search 
         corrl_line0_line1 = sp.signal.correlate2d(line0.values, line1.values, mode = 'same')#  use mode = same area to use the line0 X& Y value
         # search for the correlation. if correlation is not center --> drift. 
@@ -2219,45 +2307,64 @@ def drift_compensation_y_topo_crrltn (xr_data_topo, y_sub_n=5, drift_interpl_met
         # find argmax index point
         #print (ind_max)
         offset = np.vstack ([offset, ind_max])
-    
+
     offset_0 = offset[: , -1] -  y_N//2
     # check offset from center 
     #offset_accumulation  = [ offset_0[:n+1].sum()  for n in range (len(offset_0)) ]
-    
+
     offset_accumulation  = np.array ( [ offset_0[:n].sum()  
-                                       for n in range (len(offset_0)+1) ])*grid_topo.Y_spacing 
+                                   for n in range (len(offset_0)+1) ])*xr_data_topo.Y_spacing 
     # offset is from between two region.. get an accumlated offset. for whole Y axis. 
     offset_accumulation_df =pd.DataFrame (
-        np.vstack ([ np.array ([ y_j *y_sub_n *grid_topo.Y_spacing  
-                                for y_j in range(len (grid_topo.Y)//y_sub_n+1) ]), 
-                    offset_accumulation]).T, columns  =['Y','offset_X'])
+    np.vstack ([ np.array ([ y_j *y_sub_n *xr_data_topo.Y_spacing  
+                            for y_j in range(len (xr_data_topo.Y)//y_sub_n+1) ]), 
+                offset_accumulation]).T, columns  =['Y','offset_X'])
     offset_accumulation_xr  = offset_accumulation_df.set_index('Y').to_xarray()
-    offset_accumulation_xr_intrpl = offset_accumulation_xr.offset_X.interp(Y = grid_topo.Y.values,  method=drift_interpl_method)
+
+    offset_accumulation_xr_intrpl = offset_accumulation_xr.offset_X.interp(Y = xr_data_topo.Y.values,  method=drift_interpl_method)
     # accumluted offset--> covert to df , xr, 
     # accumnulated offset to compensate in X 
     # use interpolation along Y --> point offset calc ==> apply to all y points. 
 
+    #offset_accumulation_xr_intrpl.plot()
+
     # for each lines, adjust value after offset compensated  ==> interpolated again. 
     xr_data_topo_offset = xr_data_topo.copy(deep= True)
     # dont forget deep copy... 
-    
-    for y_j, y  in enumerate (xr_data_topo.Y):
-        new_x_i =  xr_data_topo.isel (Y=y_j).X - offset_accumulation_xr_intrpl.isel(Y=y_j)
-        # for each y axis. shift X position 
-        xr_data_topo_offset_y_j = xr_data_topo_offset.isel (Y=y_j).assign_coords({"X": new_x_i}) 
-        # assign_coord as a new calibrated offset-X coords
-        xr_data_topo_offset_y_j_intp = xr_data_topo_offset_y_j.interp(X=xr_data_topo.X)
-        # using original X points, interpolated offset- topo --> set new topo value to original X position 
-        xr_data_topo_offset.topography[dict(Y = y_j)] =  xr_data_topo_offset_y_j_intp.topography
-        #grid_topo_offset.isel(Y=y_j).topography.values = grid_topo_offest_y_j_intp.topography
-        # use [dict()] for assign values , instead of isel() 
-        # isel is not working... follow the instruction manual in web.!
-    fig,axs = plt.subplots(ncols = 2, figsize = (6,3))
-    xr_data_topo.topography.plot(ax =axs[0])
-    xr_data_topo_offset.topography.plot(ax =axs[1])
-    plt.show()
-    return xr_data_topo_offset
 
+    #offset_accumulation_xr_intrpl
+    # for each lines, adjust value after offset compensated  ==> interpolated again. 
+    xr_data_offset = xr_data_pad.copy(deep= True)
+    # dont forget deep copy... 
+    # used padding xr result for applying offset 
+
+
+    for ch_i, ch_name in enumerate (xr_data_pad): 
+        print(ch_i, ch_name)
+        # adjust y drift of all channels
+        #xr_data_pad[ch_name]
+        for y_j, y  in enumerate (xr_data_pad[ch_name].Y):
+            new_x_i =  xr_data_offset.isel (Y=y_j).X - offset_accumulation_xr_intrpl.isel(Y=y_j)
+            # for each y axis. shift X position 
+            #new_x_i
+            xr_data_offset_ch_y_j = xr_data_pad[ch_name].isel (Y=y_j).assign_coords({"X": new_x_i}) 
+            #xr_data_offset_y_j
+
+            # assign_coord as a new calibrated offset-X coords
+            xr_data_offset_ch_y_j_intp = xr_data_offset_ch_y_j.interp(X=xr_data_offset.X)
+            #xr_data_offset_y_j_intp
+
+            xr_data_pad[ch_name][dict(Y = y_j)]= xr_data_offset_ch_y_j_intp
+            #grid_topo_offset.isel(Y=y_j).topography.values = grid_topo_offest_y_j_intp.topography
+            # use [dict()] for assign values , instead of isel() 
+            # isel is not working... follow the instruction manual in web.!
+    #xr_data_pad
+
+    fig,axs = plt.subplots(ncols = 2, figsize = (8,3))
+    xr_data.topography.plot(ax =axs[0], robust = True)
+    xr_data_pad.topography.plot(ax =axs[1], robust = True)
+    plt.show()
+    return xr_data_offset
 
 # ### Not Used Previous (WORKING)Functions (FOR 3d ONLY)
 
