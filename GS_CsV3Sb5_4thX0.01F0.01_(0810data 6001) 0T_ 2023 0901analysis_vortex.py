@@ -34,9 +34,9 @@
 #     * Cleaving at 82K at LT cleaving holder in EX chamber
 #     * UHV condition (<5E-10Torr)
 # ## **Tip: Electro chemically etched W Tip# 11  normal metal tip**
-# ## Measurement temp: mK ( $/approx$ 40 mK)
+# ## Measurement temp: mK ( <font color= red > $\approx$ 700 mK </font>)
 #
-# ## <font color= red > No Magnetic field 0T (Z)   </font>
+# ## <font color= red > Magnetic field 0 T (Z)   </font>
 # -
 
 # # <font color= orange > 0. Preparation  </font>
@@ -249,7 +249,7 @@ files_df[files_df.type=='3ds']#.file_name.iloc[0]
 # 3D data 
 #grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[2])
 # line data
-grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[6])
+grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[0])
 grid_xr
 
 # ## 1-2.2. Separate topography / gird_3D (I_fb, LIX_fb)
@@ -297,7 +297,7 @@ grid_xr.topography.plot(robust= True)
 
 # ### after crop, reassgin coords  X&Y 
 
-'''
+"""
 
 grid_xr = grid_xr.assign_coords({'X': grid_xr.X -  grid_xr.X.min()})
 grid_xr = grid_xr.assign_coords({'Y': grid_xr.Y -  grid_xr.Y.min()})
@@ -306,7 +306,8 @@ grid_xr = grid_xr.assign_coords({'Y': grid_xr.Y -  grid_xr.Y.min()})
 grid_xr_crop = grid_xr_crop.assign_coords({'X': grid_xr.X -  grid_xr.X.min()})
 grid_xr_crop = grid_xr_crop.assign_coords({'Y': grid_xr.Y -  grid_xr.Y.min()})
 
-'''
+
+"""
 
 
 # +
@@ -327,21 +328,24 @@ grid_3D #= grid_3D.where (grid_3D.Y<1.25E-9, drop = True)
 #  Padding & dirft correlation 
 ##################################
 
+'''
 grid_xr_pad = padding_xr(grid_xr,  padding_dim = 'X', padding_shape=10)
 grid_xr_pad.LIX_fb.sel(bias_mV=0).plot(robust = True)
 
 
 grid_xr_drft_y = drift_compensation_y_topo_crrltn(grid_xr)
 grid_xr_drft_y_pad = padding_xr ( grid_xr_drft_y, padding_dim='Y', padding_shape= 10)
+'''
 
 
+# -
 
-# +
+
 ########################
 # check rotation 
 # & crop boundary area 
 ##########################
-
+'''
 
 grid_xr_drft_y_rot = rotate_3D_xr ( grid_xr_drft_y_pad, rotation_angle= -4)
 # shape of X & Y need to be the same 
@@ -353,12 +357,12 @@ grid_xr_drft_y_rot = grid_xr_drft_y_rot.where(
 
 grid_xr_drft_y_rot.topography.plot(robust = True)
 
-# -
+'''
 
 
 
 # +
-grid_3D_gap = grid_3D_SCgap(grid_xr_drft_y_rot, tolerance_I =2E-11,tolerance_LIX =2E-11, apply_SGfilter = True,  window_length = 7, polyorder = 3)
+grid_3D_gap = grid_3D_SCgap(grid_xr, tolerance_I =2E-11,tolerance_LIX =2E-11, apply_SGfilter = True,  window_length = 7, polyorder = 3)
 
 
 #grid_3D_gap = grid_3D_SCgap(grid_xr_crop, tolerance_I =2E-11,tolerance_LIX =2E-11, apply_SGfilter = True,  window_length = 7, polyorder = 3)
@@ -368,9 +372,10 @@ grid_3D_gap#.plateau_size_map_LIX.plot()
 
 
 
+''''
 grid_LDOS = grid_3D_gap[['LDOS_fb']]
 grid_LDOS
-
+'''
 # -
 
 # ###  To use Raw data
@@ -441,18 +446,10 @@ grid_LDOS
 
 # ### 1.4 Topography view 
 
-grid_topo = grid_topo.assign_coords({'X': grid_topo.X -  grid_topo.X.min()})
-grid_topo = grid_topo.assign_coords({'Y': grid_topo.Y -  grid_topo.Y.min()})
-grid_topo
-
-grid_3D_gap = grid_3D_gap.assign_coords({'X': grid_3D_gap.X -  grid_3D_gap.X.min()})
-grid_3D_gap = grid_3D_gap.assign_coords({'Y': grid_3D_gap.Y -  grid_3D_gap.Y.min()})
-grid_3D_gap
-
 # +
-print(str (round ((grid_topo.X.max().values-grid_topo.X.min().values)*1E9 ,2)),
+print(str (round ((grid_topo.X.max().values-grid_topo.X.min().values)*1E9 )),
       'nm X ',
-      str (round ( (grid_topo.Y.max().values-grid_topo.Y.min().values)*1E9,2 ) ), 
+      str (round ( (grid_topo.Y.max().values-grid_topo.Y.min().values)*1E9 ) ), 
       'nm')
 
 
@@ -472,10 +469,10 @@ fig, axs = plt.subplots(1, 1, figsize = (6,4))
 isns.imshow(plane_fit_y_xr(grid_topo).topography, cmap ='copper',robust = True, ax =axs)
 axs.set_title('Topography ( '+ 
               str (round (
-                  (grid_topo.X.max().values-grid_topo.X.min().values)*1E9,1 ))+
+                  (grid_topo.X.max().values-grid_topo.X.min().values)*1E9 ))+
               ' nm X '+
               str (round ( 
-                  (grid_topo.Y.max().values-grid_topo.Y.min().values)*1E9,1 ))+ 
+                  (grid_topo.Y.max().values-grid_topo.Y.min().values)*1E9 ))+ 
               ' nm)',fontsize='medium')
 
 plt.show()
@@ -531,8 +528,7 @@ hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb',frame_width=300)#.opts(clim = (0.0E
 # ####  1.5.2. Y or X slicing 
 
 #hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y')#.opts(clim=(0, 8E-10)) #
-#hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X',frame_width=300).opts(clim=(0, 0.5E-9)) #
-hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y',frame_width=300)#.opts(clim=(0, 1E-9)) # check low intensity area
+hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X',frame_width=300)#.opts(clim=(0, 0.5E-9)) #hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y',frame_width=300)#.opts(clim=(0, 1E-9)) # check low intensity area
 #hv_XY_slicing(grid_3D,slicing= 'Y').opts(clim=(0, 1E-11))
 
 
@@ -715,10 +711,12 @@ dmap.opts(clim = (0,1E-9))*bbox_points
 
 bound_box
 
-bbox_4, _ = hv_bbox_avg(grid_LDOS, bound_box= bound_box, ch ='LDOS_fb',slicing_bias_mV = 0.0)
+bbox_2, _ = hv_bbox_avg(grid_LDOS, bound_box= bound_box, ch ='LDOS_fb',slicing_bias_mV = 0.0)
 
+# + [markdown] jp-MarkdownHeadingCollapsed=true
 # #### multiple area selection ('bbox_1', 'bbox_2','bbox_3', 'bbox_4') 
 #      * plot multi regions with ROI 
+# -
 
 
 isns.imshow(plane_fit_y_xr(grid_topo).topography.values, robust = True)
@@ -741,10 +739,10 @@ LDOS_fb_area2_df =  bbox_2.LDOS_fb.to_dataframe()
 LDOS_fb_area3_df =  bbox_3.LDOS_fb.to_dataframe()
 LDOS_fb_area4_df =  bbox_4.LDOS_fb.to_dataframe() 
 # xr to dataframe
-LDOS_fb_area1_df.columns = ['Area1(V-Sb)']
-LDOS_fb_area2_df.columns = ['Area2(Cs)']# change df names 
-LDOS_fb_area3_df.columns = ['Area3(V-Sb)']
-LDOS_fb_area4_df.columns = ['Area4(Cs)']# change df names 
+LDOS_fb_area1_df.columns = ['Area1']
+LDOS_fb_area2_df.columns = ['Area2']# change df names 
+LDOS_fb_area3_df.columns = ['Area3']
+LDOS_fb_area4_df.columns = ['Area4']# change df names 
 
 LDOS_fb_area_df = pd.concat( [LDOS_fb_area1_df,LDOS_fb_area2_df,LDOS_fb_area3_df,LDOS_fb_area4_df], axis= 1)
 LDOS_fb_area_df# = LDOS_fb_area_df.swaplevel(0,2)
@@ -760,13 +758,13 @@ LDOS_fb_area_df# = LDOS_fb_area_df.swaplevel(0,2)
 
 # -
 
-sns.lineplot(x= 'bias_mV', y = 'LDOS', data = LDOS_fb_area_df_melt, hue ='Area')
-plt.show()
-
 LDOS_fb_area_df = LDOS_fb_area_df.reset_index()
-LDOS_fb_area_df_melt = LDOS_fb_area_df.melt(id_vars = ['Y','X','bias_mV'], value_vars = ['Area1(V-Sb)','Area2(Cs)','Area3(V-Sb)','Area4(Cs)'])
+LDOS_fb_area_df_melt = LDOS_fb_area_df.melt(id_vars = ['Y','X','bias_mV'], value_vars = ['Area1','Area2','Area3','Area4'])
 LDOS_fb_area_df_melt.columns = ['Y','X','bias_mV', 'Area','LDOS']
 LDOS_fb_area_df_melt
+
+sns.lineplot(x= 'bias_mV', y = 'LDOS', data = LDOS_fb_area_df_melt, hue ='Area')
+plt.show()
 
 # +
 # Bbox1 & Bbox2 
@@ -819,7 +817,7 @@ axs[0].add_patch(rec_in_topo_bb2)
 axs[0].add_patch(rec_in_topo_bb3)
 axs[0].add_patch(rec_in_topo_bb4)
 
-isns.imshow (grid_LDOS.LDOS_fb.sel(bias_mV = 0, method ='nearest'), robust = True,ax = axs[1])
+isns.imshow (grid_LDOS.LDOS_fb.sel(bias_mV = 0, method ='nearest'),ax = axs[1])
 # LDOS_bias_mV
 rec_in_topo_bb1 =  patches.Rectangle( rec_xy_bb1 , rec_w_px_bb1,rec_h_px_bb1 , linewidth=1, edgecolor=sns.color_palette('tab10')[0], facecolor='none')
 rec_in_topo_bb2 =  patches.Rectangle( rec_xy_bb2 , rec_w_px_bb2,rec_h_px_bb2 , linewidth=1, edgecolor=sns.color_palette('tab10')[1], facecolor='none')
@@ -970,7 +968,7 @@ plt.show()
 #bias_mV_slices= [-1.4, -1.2, -1, -0.8, -0.6, 0, 0.6, 0.8,1,1.2,1.4][::-1]
 #bias_mV_slices= [-1.0, -0.8, -0.6,-0.4,-0.2, 0,0.2,0.4, 0.6, 0.8,1][::-1]
 #bias_mV_slices= [ -0.8, -0.6,-0.4,-0.2, 0,0.2,0.4, 0.6, 0.8][::-1]
-bias_mV_slices = np.arange(-1.6,1.61,0.2)
+bias_mV_slices = np.arange(-1.20,1.21,0.3)
 #bias_mV_slices = np.arange(-0.48,0.49,0.12)
 print ( bias_mV_slices)
 bias_mV_slices_v = grid_LDOS.bias_mV.sel(bias_mV = bias_mV_slices, method = "nearest").values#.round(2)
@@ -1269,18 +1267,16 @@ from skimage.draw import disk
 grid_topo_smth =  filter_gaussian_xr ( plane_fit_x_xr(plane_fit_y_xr(grid_topo)), sigma =30)
 grid_topo_smth = filter_convert2grayscale ( filter_median_xr(grid_topo_smth))
 
-im = grid_topo_smth.topography.values
+
 normalized_data = 255 * (im - im.min()) / (im.max() - im.min())
 # Ensure the values are within [0, 255] range
 #normalized_data = np.clip(normalized_data, 0, 255).astype(np.uint8)
 #im
-
-
+isns.imshow(im)
 im = grid_topo_smth.topography.values
 im_ivt= 255-normalized_data
-im = im_ivt
 
-isns.imshow(im)
+
 
 ###############
 # local max
@@ -1326,11 +1322,7 @@ plt.show()
 
 grid_topo_smth
 
-# +
-#grid_topo_smth.topography.zeros()
-# -
-
-# ### vertical line 
+grid_topo_smth.topography.zeros()
 
 # +
 grid_topo_smth['label'] = xr.zeros_like(grid_topo_smth.topography)
@@ -1339,41 +1331,29 @@ grid_topo_smth['label'] = xr.zeros_like(grid_topo_smth.topography)
 # 1,2,3,4,5,6,=
 
 for idx in coordinates:
+    
+    '''
     grid_topo_smth.label[idx[0], idx[1]] = 1
     grid_topo_smth.label[idx[0]-1, idx[1]] = 2
     grid_topo_smth.label[idx[0]-2, idx[1]] = 3
     grid_topo_smth.label[idx[0]-3, idx[1]] = 4
     grid_topo_smth.label[idx[0]-4, idx[1]] = 5
-    #grid_topo_smth.label[idx[0]-5, idx[1]] = 6
-    #grid_topo_smth.label[idx[0]-6, idx[1]] = 7
+    grid_topo_smth.label[idx[0]-5, idx[1]] = 6
+    grid_topo_smth.label[idx[0]-6, idx[1]] = 7
+    '''
+    grid_topo_smth.label[idx[0], idx[1]] = 1
+    grid_topo_smth.label[idx[0], idx[1]-1] = 2
+    grid_topo_smth.label[idx[0], idx[1]-2] = 3
+    grid_topo_smth.label[idx[0], idx[1]-3] = 4
+    grid_topo_smth.label[idx[0], idx[1]-4] = 5
+    grid_topo_smth.label[idx[0], idx[1]-5] = 6
+    #grid_topo_smth.label[idx[0], idx[1]-6] = 7
+    
+    
+    
 # draw a line 
 
-isns.imshow(grid_topo_smth.label, cmap = 'inferno_r')
-
-# +
-# value --> use Where ! 
-
-
-col_wrap=4
-
-g = isns.ImageGrid(grid_LDOS.sel(bias_mV = bias_mV_slices, method = "nearest").LDOS_fb.values, 
-                   cbar=False, height=2, col_wrap=col_wrap,  cmap="bwr", robust = True)
-# set a col_wrap for suptitle 
-
-for axes_i  in range( len(bias_mV_slices)):
-    #print (int(axes_i/col_wrap),axes_i%col_wrap)  # axes number check 
-    g.axes[int((axes_i)/col_wrap)][axes_i%col_wrap].set_title(str(bias_mV_slices_v[axes_i].round(2))+' mV')
-plt.tight_layout()
-plt.show()
-# -
-
-grid_topo_smth#.topography
-
-fig,axs = plt.subplots(1,1, figsize = (5,5))
-isns.imshow (grid_topo_smth.topography, ax =axs,cbar= False, cmap = "gray")
-isns.imshow (grid_topo_smth.label.where (grid_topo_smth.label!=0), cmap = 'inferno_r', ax =axs)
-plt.show()
-
+isns.imshow(grid_topo_smth.label, cmap = 'inferno')
 
 # +
 # check filter for label 1 
@@ -1387,7 +1367,7 @@ label3 = (grid_topo_smth.label == 3)
 label4 = (grid_topo_smth.label == 4)
 label5 = (grid_topo_smth.label == 5)
 label6 = (grid_topo_smth.label == 6)
-label7 = (grid_topo_smth.label == 7)
+#label7 = (grid_topo_smth.label == 7)
 
 
 # +
@@ -1401,152 +1381,40 @@ label3_df = grid_LDOS.LDOS_fb.where( label3, drop= True).to_dataframe().dropna()
 label4_df = grid_LDOS.LDOS_fb.where( label4, drop= True).to_dataframe().dropna()
 label5_df = grid_LDOS.LDOS_fb.where( label5, drop= True).to_dataframe().dropna()
 label6_df = grid_LDOS.LDOS_fb.where( label6, drop= True).to_dataframe().dropna()
-label7_df = grid_LDOS.LDOS_fb.where( label7, drop= True).to_dataframe().dropna()
+#label7_df = grid_LDOS.LDOS_fb.where( label7, drop= True).to_dataframe().dropna()
 
-
+'''
 frames = [label1_df, label2_df, label3_df, label4_df,label5_df,label6_df,label7_df]
-keys = ['V-Sb(1)', '2', '3', '4','Cs(5)','6','Cs(7)']
+keys = ['Dip1', 'Dip2', 'Dip3', 'Dip4','Dip5','Dip6','Dip7']
+'''
+frames = [label1_df, label2_df, label3_df, label4_df,label5_df,label6_df]
+keys = ['1', '2', '3', '4','5','6']
+
+
 
 concatenated_df = pd.concat(frames, keys=keys)
 
 
 
 concatenated_LDOS =  concatenated_df.reset_index()
-
-concatenated_LDOS= concatenated_LDOS.rename(columns ={'level_0'  :'relative position'})
-concatenated_LDOS
 # -
 
-#label1 = (grid_topo_smth.label == 1)
-grid_LDOS.LDOS_fb.where(label1,)
-
-sns.lineplot(data=concatenated_LDOS, x='bias_mV', y='LDOS_fb', hue='relative position', palette = 'inferno_r')
+sns.lineplot(data=concatenated_df.reset_index(), x='bias_mV', y='LDOS_fb', hue='level_0', palette = 'inferno')
 
 
-# ### horizontal line 
+label1_df.groupby("bias_mV").mean()
 
 # +
-grid_topo_smth['label'] = xr.zeros_like(grid_topo_smth.topography)
-# deep position 1 
-# Toward peak position (lower (-1 at -Y) 
-# 1,2,3,4,5,6,=
+frames_mean = [label1_df.groupby("bias_mV").mean(), label2_df.groupby("bias_mV").mean(), label3_df.groupby("bias_mV").mean(), label4_df.groupby("bias_mV").mean(),label5_df.groupby("bias_mV").mean(),label6_df.groupby("bias_mV").mean()]
+keys = ['1', '2', '3', '4','5','6']
 
-for idx in coordinates:
-    grid_topo_smth.label[idx[0], idx[1]] = 1
-    grid_topo_smth.label[idx[0], idx[1]-1] = 2
-    grid_topo_smth.label[idx[0], idx[1]-2] = 3
-    grid_topo_smth.label[idx[0], idx[1]-3] = 4
-    grid_topo_smth.label[idx[0], idx[1]-4] = 5
-    grid_topo_smth.label[idx[0], idx[1]-5] = 6
-    grid_topo_smth.label[idx[0], idx[1]-6] = 7
-    grid_topo_smth.label[idx[0], idx[1]-7] = 8
-    grid_topo_smth.label[idx[0]-1, idx[1]] = 1
-    grid_topo_smth.label[idx[0]-1, idx[1]-1] = 2
-    grid_topo_smth.label[idx[0]-1, idx[1]-2] = 3
-    grid_topo_smth.label[idx[0]-1, idx[1]-3] = 4
-    grid_topo_smth.label[idx[0]-1, idx[1]-4] = 5
-    grid_topo_smth.label[idx[0]-1, idx[1]-5] = 6
-    grid_topo_smth.label[idx[0]-1, idx[1]-6] = 7
-    grid_topo_smth.label[idx[0]-1, idx[1]-7] = 8
-    
-# draw a line 
 
-isns.imshow(grid_topo_smth.label, cmap = 'inferno_r')
+
+concatenated_mean_df = pd.concat(frames_mean, keys=keys)
 # -
 
-grid_topo_smth.topography
-
-fig,axs = plt.subplots(1,1, figsize = (5,5))
-isns.imshow (grid_topo_smth.topography, ax =axs,cbar= False, cmap = "gray")
-isns.imshow (grid_topo_smth.label.where (grid_topo_smth.label!=0), cmap = 'inferno_r', ax =axs)
-plt.show()
-
-
-# +
-# check filter for label 1 
-#label1 = (grid_topo_smth.label == 1)
-#label1#.sum()
-
-
-label1 = (grid_topo_smth.label == 1)
-label2 = (grid_topo_smth.label == 2)
-label3 = (grid_topo_smth.label == 3)
-label4 = (grid_topo_smth.label == 4)
-label5 = (grid_topo_smth.label == 5)
-label6 = (grid_topo_smth.label == 6)
-label7 = (grid_topo_smth.label == 7)
-label8 = (grid_topo_smth.label == 8)
-
-
-expanded_mask_label1 = np.expand_dims(label1, axis=2)
-expanded_mask_label2 = np.expand_dims(label2, axis=2)
-expanded_mask_label3 = np.expand_dims(label3, axis=2)
-expanded_mask_label4 = np.expand_dims(label4, axis=2)
-expanded_mask_label5 = np.expand_dims(label5, axis=2)
-expanded_mask_label6 = np.expand_dims(label6, axis=2)
-expanded_mask_label7 = np.expand_dims(label7, axis=2)
-expanded_mask_label8 = np.expand_dims(label8, axis=2)
-
-
-# -
-
-
-#grid_LDOS =  grid_LDOS.drop('label')
-grid_LDOS.where(expanded_mask_label1)
-
-# +
-#grid_LDOS.LDOS_fb.where( label1,drop= True ).mean(dim = ["X","Y"]).plot()
-# check averaged STS for label1
-#grid_LDOS.LDOS_fb.where( label1, drop= True).to_dataframe().dropna()
-# selected df for each label 
-label1_df = grid_LDOS.LDOS_fb.where( expanded_mask_label1).to_dataframe().dropna()
-label2_df = grid_LDOS.LDOS_fb.where( expanded_mask_label2).to_dataframe().dropna()
-label3_df = grid_LDOS.LDOS_fb.where( expanded_mask_label3).to_dataframe().dropna()
-label4_df = grid_LDOS.LDOS_fb.where( expanded_mask_label4).to_dataframe().dropna()
-label5_df = grid_LDOS.LDOS_fb.where( expanded_mask_label5).to_dataframe().dropna()
-label6_df = grid_LDOS.LDOS_fb.where( expanded_mask_label6).to_dataframe().dropna()
-label7_df = grid_LDOS.LDOS_fb.where( expanded_mask_label7).to_dataframe().dropna()
-label8_df = grid_LDOS.LDOS_fb.where( expanded_mask_label8).to_dataframe().dropna()
-
-
-frames = [label1_df, label2_df, label3_df, label4_df,label5_df,label6_df,label7_df,label8_df]
-keys = ['V-Sb(1)', '2', '3', '4','5','6','7','Cs(8)']
-
-concatenated_df = pd.concat(frames, keys=keys)
-
-
-
-concatenated_LDOS =  concatenated_df.reset_index()
-
-concatenated_LDOS= concatenated_LDOS.rename(columns ={'level_0'  :'relative position'})
-concatenated_LDOS
-# -
-
-sns.lineplot(data=concatenated_LDOS, x='bias_mV', y='LDOS_fb', hue='relative position', palette = 'inferno_r')
-
-
-# +
-label1_mean_df = label1_df.groupby('bias_mV').mean()
-label2_mean_df = label2_df.groupby('bias_mV').mean()
-label3_mean_df = label3_df.groupby('bias_mV').mean()
-label4_mean_df = label4_df.groupby('bias_mV').mean()
-label5_mean_df = label5_df.groupby('bias_mV').mean()
-label6_mean_df = label6_df.groupby('bias_mV').mean()
-label7_mean_df = label7_df.groupby('bias_mV').mean()
-label8_mean_df = label8_df.groupby('bias_mV').mean()
-
-
-
-
-frames_mean = [label1_mean_df, label2_mean_df, label3_mean_df, label4_mean_df,label5_mean_df,label6_mean_df,label7_mean_df,label8_mean_df]
-keys = ['V-Sb(1)', '2', '3', '4','5','6','7','Cs(8)']
-
-concatenated_df = pd.concat(frames_mean, keys=keys)
-
-
-g = isns.imshow( concatenated_df.unstack().T, robust = True , cbar  = False)
+g = isns.imshow(concatenated_mean_df.unstack().T,cbar =False)
 g.set_aspect(0.01)
-
 
 # +
 ############3
@@ -1723,9 +1591,7 @@ grid_LDOS_rot  = grid_LDOS
 # -
 
 
-grid_LDOS 
-
-grid_LDOS_sg= savgolFilter_xr(grid_LDOS_rot, window_length=11, polyorder=3)
+grid_LDOS_sg= savgolFilter_xr(grid_LDOS_rot, window_length = 31, polyorder=3)
 
 # +
 ##################################
@@ -1777,19 +1643,20 @@ bound_box
 
 grid_LDOS_bbox,_ = hv_bbox_avg(grid_LDOS_rot, ch ='LDOS_fb',slicing_bias_mV=-0 , bound_box = bound_box)
 
-grid_LDOS_bbox
+# +
+#grid_LDOS_bbox
 
 # +
 # grid_LDOS_bbox
 
-average_in= 'X'
+average_in= 'Y'
 
 grid_LDOS_bbox_pk = grid3D_line_avg_pks(grid_LDOS_bbox) 
 grid_LDOS_bbox_pk  = grid3D_line_avg_pks( grid_LDOS_bbox ,
                                          ch_l_name ='LDOS_fb',
                                          average_in= average_in,
-                                         distance =1, 
-                                         width= 1,
+                                         distance = 4, 
+                                         width= 4,
                                          threshold = 1E-11, 
                                          padding_value= 0,
                                          prominence=1E-11
@@ -1841,7 +1708,6 @@ for idx, centroid in centroids.iterrows():
                 textcoords="offset points", xytext=(0,10), ha='center', fontsize=10, fontweight='bold')
 
 ax.legend_.remove()
-
 plt.show()
 # -
 
@@ -1857,10 +1723,10 @@ sns.set_style("ticks")
 #############
 # Choose peak labels
 ###############
-grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==7)
-                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == 2)
+grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==8)
+                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == 13)
                                                     #|(grid_LDOS_bbox_pk_df.y_kmeans  == 0)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == 3)]
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == 5)]
 
 
 grid_LDOS_bbox_pk_df_choose =grid_LDOS_bbox_pk_df
@@ -1963,10 +1829,10 @@ plt.show()
 # Choose peak labels
 ###############
 
-grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==7)
-                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == 2)
+grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==8)
+                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == 1)
                                                     #|(grid_LDOS_bbox_pk_df.y_kmeans  == 0)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == 3)]
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == 5)]
 
 
 ##########
@@ -2021,15 +1887,15 @@ original_legend = ax.get_legend()
 
 
 SCgaps_negD1 = r'-$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == 7].mean().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==8].mean().bias_mV,
     2) ) +r'$\pm$' +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == 7].std().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==8].std().bias_mV,
     2) )  +' mV'
 
 SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == 3].mean().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==5].mean().bias_mV,
     2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == 3].std().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==5].std().bias_mV,
     2) )    +' mV'
 
 
@@ -2457,7 +2323,7 @@ grid_topo.isel (X = int (len(grid_topo.X)/2)).isel (Y = int (len(grid_topo.Y)/2)
 
 
 fft_0 = grid_LDOS_fft.sel(freq_bias_mV = 0, method = 'nearest').LDOS_fb_fft
-isns.imshow(fft_0, robust = True)
+isns.imshow(fft_0, robust = True, cmap = "viridis")
 
 
 ### Xr rotation function 

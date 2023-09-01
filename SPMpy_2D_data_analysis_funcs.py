@@ -1695,14 +1695,14 @@ def plot_2D_xr(xrdata,
 
     """
     ####################################
-    isns.set_image(origin ="lower")
+    isns.set_image(cmap = 'viridis', origin ="lower")
     fig,axes = plt.subplots(ncols = ncols,
                             nrows = len(xrdata.data_vars)//ncols+1,
                             figsize = figsize)
     axs = axes.ravel()
     axs = Trim_axs(axs, len(xrdata.data_vars))
     # triming first with respect to # of data channel 
-    isns.set_image(origin='lower')   #  set image  direction
+    isns.set_image(cmap = 'viridis',origin='lower')   #  set image  direction
     for i,i_channels in enumerate(xrdata):
         isns_channels= i_channels+'_isns'
         if 'LIX' in i_channels:
@@ -2694,7 +2694,7 @@ def xr_isns_plot_r_space(xrdata,
     axs = axes.ravel()
     axs = trim_axs(axs, len(xrdata.data_vars))
     # triming first with respect to # of data channel 
-    isns.set_image(origin='lower')   #  set image  direction
+    isns.set_image(cmap = 'viridis', origin='lower')   #  set image  direction
     
     for i,i_channels in enumerate(xrdata):
         isns_channels= i_channels+'_isns'
