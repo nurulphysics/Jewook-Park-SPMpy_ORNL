@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -531,8 +531,8 @@ hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb',frame_width=300)#.opts(clim = (0.0E
 # ####  1.5.2. Y or X slicing 
 
 #hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y')#.opts(clim=(0, 8E-10)) #
-#hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X',frame_width=300).opts(clim=(0, 0.5E-9)) #
-hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y',frame_width=300)#.opts(clim=(0, 1E-9)) # check low intensity area
+hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X',frame_width=300).opts(clim=(0, 0.5E-9)) #
+#hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y',frame_width=300)#.opts(clim=(0, 1E-9)) # check low intensity area
 #hv_XY_slicing(grid_3D,slicing= 'Y').opts(clim=(0, 1E-11))
 
 
@@ -998,14 +998,14 @@ plt.show()
 
 # +
 ### check the difference between  peak poistion & zerobias position 
-bias_mv_a = 0.2
+bias_mv_a = -0.27
 
 bias_mV_b = 0
 
 grid_LDOS_a_b = grid_LDOS.sel(bias_mV = bias_mv_a, method = "nearest") -  grid_LDOS.sel(bias_mV = bias_mV_b, method = "nearest") 
 fig,axs = plt.subplots(1,1, figsize = (4,4))
 isns.imshow( grid_LDOS_a_b.LDOS_fb, robust = True, ax = axs, cmap = 'bwr')
-axs.set_title (  r'$\Delta$ ' + 'LDOS ' + '(' +str(bias_mv_a) + ' mV - '  +str(bias_mV_b) + ' mV )', fontsize = 'medium')
+#axs.set_title (  r'$\Delta$ ' + 'LDOS ' + '(' +str(bias_mv_a) + ' mV - '  +str(bias_mV_b) + ' mV )', fontsize = 'medium')
 plt.show()
 
 
@@ -1142,11 +1142,24 @@ grid_LDOS_th= th_mean_roi_label_2D_xr(grid_LDOS.rolling(X=4, Y=2,min_periods=2,c
 grid_LDOS_th.LDOS_fb_th
 
 
+# zero bias peak map 
+isns.imshow (grid_LDOS.LDOS_fb.where(grid_LDOS.bias_mV ==0, drop = True ), robust = True,cmap = 'Blues')
+
+isns.imshow(grid_LDOS.LDOS_fb.where(grid_LDOS.bias_mV >0.27).where(grid_LDOS.bias_mV <0.4).mean(dim="bias_mV"),
+            robust=True, cmap = 'bwr')
+# coherence peak map 
+
 # +
-#grid_LDOS_th= th_otsu_roi_label_2D_xr(equalize_hist_xr(grid_LDOS), bias_mV_th = 0,  threshold_flip=False)
+grid_LDOS.LDOS_fb.where(grid_LDOS.bias_mV >0.4).where(grid_LDOS.bias_mV <0.6).mean(dim="bias_mV").plot(robust=True)
+
+grid_LDOS_ref = grid_LDOS.LDOS_fb.where(grid_LDOS.bias_mV >0.4).where(grid_LDOS.bias_mV <0.6).mean(dim="bias_mV")#.plot(robust=True)
+
+
+# +
+grid_LDOS_th= th_otsu_roi_label_2D_xr(equalize_hist_xr(grid_LDOS), bias_mV_th = 0,  threshold_flip=False)
 # use Otsu 
 
-grid_LDOS_th= th_multiotsu_roi_label_2D_xr(grid_LDOS, bias_mV_th = 0.0, multiclasses = 5)
+#grid_LDOS_th= th_multiotsu_roi_label_2D_xr(grid_LDOS, bias_mV_th = 1.0, multiclasses = 6)
 # in case of multiotsu
 
 #grid_LDOS_th= th_mean_roi_label_2D_xr(grid_LDOS.rolling(X=4, Y=2,min_periods=2,center= True).mean(),
@@ -1156,8 +1169,8 @@ grid_LDOS_th= th_multiotsu_roi_label_2D_xr(grid_LDOS, bias_mV_th = 0.0, multicla
 # results. 
     #grid_LDOS_th
 
-isns.imshow (grid_LDOS_th.LDOS_fb_th_label, aspect =1)
-isns.imshow(grid_LDOS_th.LDOS_fb_th)
+#isns.imshow (grid_LDOS_th.LDOS_fb_th_label, aspect =1)
+isns.imshow(grid_LDOS_th.LDOS_fb_th, cmap = 'viridis')
 plt.show()
 
 
@@ -1432,42 +1445,126 @@ grid_topo_smth['label'] = xr.zeros_like(grid_topo_smth.topography)
 # 1,2,3,4,5,6,=
 
 for idx in coordinates:
-    grid_topo_smth.label[idx[0], idx[1]] = 1
+    #grid_topo_smth.label[idx[0], idx[1]-3] = 0
+    grid_topo_smth.label[idx[0], idx[1]-2] = 1
     grid_topo_smth.label[idx[0], idx[1]-1] = 2
-    grid_topo_smth.label[idx[0], idx[1]-2] = 3
-    grid_topo_smth.label[idx[0], idx[1]-3] = 4
-    grid_topo_smth.label[idx[0], idx[1]-4] = 5
-    grid_topo_smth.label[idx[0], idx[1]-5] = 6
-    grid_topo_smth.label[idx[0], idx[1]-6] = 7
-    grid_topo_smth.label[idx[0], idx[1]-7] = 8
-    grid_topo_smth.label[idx[0]-1, idx[1]] = 1
+    grid_topo_smth.label[idx[0], idx[1]] = 3
+    grid_topo_smth.label[idx[0], idx[1]-1] = 4
+    grid_topo_smth.label[idx[0], idx[1]-2] = 5
+    grid_topo_smth.label[idx[0], idx[1]-3] = 6
+    grid_topo_smth.label[idx[0], idx[1]-4] = 7
+    grid_topo_smth.label[idx[0], idx[1]-5] = 8
+    grid_topo_smth.label[idx[0], idx[1]-6] = 9
+    grid_topo_smth.label[idx[0], idx[1]-7] = 10
+    
+    #grid_topo_smth.label[idx[0]-1, idx[1]-3] = 0
+    grid_topo_smth.label[idx[0]-1, idx[1]-2] = 1
     grid_topo_smth.label[idx[0]-1, idx[1]-1] = 2
-    grid_topo_smth.label[idx[0]-1, idx[1]-2] = 3
-    grid_topo_smth.label[idx[0]-1, idx[1]-3] = 4
-    grid_topo_smth.label[idx[0]-1, idx[1]-4] = 5
-    grid_topo_smth.label[idx[0]-1, idx[1]-5] = 6
-    grid_topo_smth.label[idx[0]-1, idx[1]-6] = 7
-    grid_topo_smth.label[idx[0]-1, idx[1]-7] = 8
+    grid_topo_smth.label[idx[0]-1, idx[1]] = 3
+    grid_topo_smth.label[idx[0]-1, idx[1]-1] = 4
+    grid_topo_smth.label[idx[0]-1, idx[1]-2] = 5
+    grid_topo_smth.label[idx[0]-1, idx[1]-3] = 6
+    grid_topo_smth.label[idx[0]-1, idx[1]-4] = 7
+    grid_topo_smth.label[idx[0]-1, idx[1]-5] = 8
+    grid_topo_smth.label[idx[0]-1, idx[1]-6] = 9
+    grid_topo_smth.label[idx[0]-1, idx[1]-7] = 10
     
 # draw a line 
 
 isns.imshow(grid_topo_smth.label, cmap = 'inferno_r')
+
+# +
+grid_topo_smth['label'] = xr.zeros_like(grid_topo_smth.topography)
+# deep position 1 
+
+for idx in coordinates:
+    #print(idx) 
+    avg_line_length = 11
+    for i in range(avg_line_length):
+        #print (i)
+        grid_topo_smth.label[idx[0], idx[1]+i-6] = i+1
+fig,axs = plt.subplots(1,1, figsize = (5,5))
+
+isns.imshow(grid_topo_smth.topography, cmap = 'gray', ax = axs) 
+
+#isns.imshow(grid_topo_smth.label.where(grid_topo_smth.label!=0), cmap = 'inferno_r', ax = axs)
+axs.plot(coordinates[:, 1], coordinates[:, 0], marker='o', markersize=8, linestyle ='',  color='r',)
+
+
+plt.show()
+
+# +
+grid_topo_smth['label'] = xr.zeros_like(grid_topo_smth.topography)
+# deep position 1 
+avg_line_length = 10
+for idx in coordinates:
+    #print(idx) 
+    
+    for i in range(avg_line_length):
+        #print (i)
+        grid_topo_smth.label[idx[0]-1, idx[1]+i-5] = i+1
+        grid_topo_smth.label[idx[0], idx[1]+i-5] = i+1
+        grid_topo_smth.label[idx[0]+1, idx[1]+i-5] = i+1
+fig,axs = plt.subplots(1,1, figsize = (5,5))
+
+isns.imshow(grid_topo_smth.topography, cmap = 'gray', ax = axs) 
+
+isns.imshow(grid_topo_smth.label.where(grid_topo_smth.label!=0), cmap = 'inferno', ax = axs, alpha =0.8)
+axs.plot(coordinates[:, 1], coordinates[:, 0], marker='o', markersize=8, linestyle ='',  color='blue',)
+
+
+plt.show()
 # -
+
+grid_topo_smth[['topography','label']].to_dataframe().groupby('label').mean().plot()
 
 grid_topo_smth.topography
 
 fig,axs = plt.subplots(1,1, figsize = (5,5))
 isns.imshow (grid_topo_smth.topography, ax =axs,cbar= False, cmap = "gray")
-isns.imshow (grid_topo_smth.label.where (grid_topo_smth.label!=0), cmap = 'inferno_r', ax =axs)
+isns.imshow (grid_topo_smth.label.where (grid_topo_smth.label!=0), cmap = 'inferno', ax =axs)
 plt.show()
 
+
+# +
+LDOS_label_df  =  pd.DataFrame()
+# 빈 데이터프레임 생성
+LDOS_label = []
+# 시리즈 데이터를 추가하기 위한 리스트 생성
+
+for i in range(avg_line_length):
+    mask_i = np.expand_dims((grid_topo_smth.label == i),  axis=2)
+    # label 들만 따로 골라냄
+    # set dimension for LDOS xr data dime
+    label_i_df = grid_LDOS.LDOS_fb.where( mask_i).to_dataframe().dropna().groupby('bias_mV').mean().T
+    LDOS_label.append(label_i_df)
+    
+# 시리즈 데이터를 데이터프레임에 추가
+for i, data in enumerate(LDOS_label):
+    column_name = f'Label_{i + 1}'  # 새로운 열 이름 생성
+    print(column_name)
+    LDOS_label_df[column_name] = data.T
+    
+#LDOS_label_df = pd.concat(LDOS_label, axis=1).T
+LDOS_label_df.plot()
+
+# +
+fig, axs = plt.subplots(2,1, figsize = (5,6))
+isns.imshow(LDOS_label_df, cbar = False, cmap = 'bwr', ax =  axs[0])
+axs[0].set_aspect (0.02)
+axs[0].set_ylabel('bias_mV')
+#axs[0].set_xlabel('bias_mV')
+
+sns.lineplot(grid_topo_smth[['topography','label']].to_dataframe().groupby('label').mean())
+axs[1].set_xlabel('pixels ')
+plt.tight_layout()
+plt.show()
 
 # +
 # check filter for label 1 
 #label1 = (grid_topo_smth.label == 1)
 #label1#.sum()
-
-
+    
 label1 = (grid_topo_smth.label == 1)
 label2 = (grid_topo_smth.label == 2)
 label3 = (grid_topo_smth.label == 3)
@@ -1725,7 +1822,7 @@ grid_LDOS_rot  = grid_LDOS
 
 grid_LDOS 
 
-grid_LDOS_sg= savgolFilter_xr(grid_LDOS_rot, window_length=11, polyorder=3)
+grid_LDOS_sg= savgolFilter_xr(grid_LDOS_rot, window_length=51, polyorder=7)
 
 # +
 ##################################
@@ -1736,7 +1833,7 @@ import holoviews as hv
 from holoviews import opts
 hv.extension('bokeh')
 
-xr_data = grid_LDOS_rot
+xr_data = grid_LDOS_sg
 ch = 'LDOS_fb'
 frame_width = 400
 
@@ -1784,23 +1881,25 @@ grid_LDOS_bbox
 
 average_in= 'X'
 
-grid_LDOS_bbox_pk = grid3D_line_avg_pks(grid_LDOS_bbox) 
+#grid_LDOS_bbox_pk = grid3D_line_avg_pks(grid_LDOS_bbox) 
 grid_LDOS_bbox_pk  = grid3D_line_avg_pks( grid_LDOS_bbox ,
                                          ch_l_name ='LDOS_fb',
                                          average_in= average_in,
-                                         distance =1, 
-                                         width= 1,
-                                         threshold = 1E-11, 
+                                         distance =3, 
+                                         width= 3,
+                                         threshold = 0.4E-11, 
                                          padding_value= 0,
-                                         prominence=1E-11
+                                         prominence=0.4E-11,
+                                         window_length=21,
+                                         polyorder=5
                                         ) 
 grid_LDOS_bbox_pk
 
 grid_LDOS_bbox_pk_slct, grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df, fig = grid_lineNpks_offset(
     grid_LDOS_bbox_pk,
     ch_l_name ='LDOS_fb',
-    plot_y_offset= 10E-11,
-    peak_LIX_min = 1E-11,
+    plot_y_offset= 8E-11,
+    peak_LIX_min = 0.4E-11,
     legend_title = "Y (nm)")
 
 plt.show()
@@ -1816,7 +1915,7 @@ from sklearn.cluster import KMeans
 
 X = grid_LDOS_bbox_pk_df[['bias_mV', 'LDOS_fb_offset']].values
 
-kmeans = KMeans(n_clusters=21)
+kmeans = KMeans(n_clusters=15)
 kmeans.fit(X)
 
 y_kmeans = kmeans.predict(X)
@@ -1838,7 +1937,7 @@ centroids = grid_LDOS_bbox_pk_df.groupby("y_kmeans")[["bias_mV", "LDOS_fb_offset
 # Annotate centroids
 for idx, centroid in centroids.iterrows():
     ax.annotate(idx, (centroid["bias_mV"], centroid["LDOS_fb_offset"]),
-                textcoords="offset points", xytext=(0,10), ha='center', fontsize=10, fontweight='bold')
+                textcoords="offset points", xytext=(0,10), ha='center', fontsize=20, fontweight='bold')
 
 ax.legend_.remove()
 
@@ -1857,10 +1956,13 @@ sns.set_style("ticks")
 #############
 # Choose peak labels
 ###############
-grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==7)
+delta1N = 4
+delta1P =7
+
+grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N)
                                                     #|(grid_LDOS_bbox_pk_df.y_kmeans  == 2)
                                                     #|(grid_LDOS_bbox_pk_df.y_kmeans  == 0)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == 3)]
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
 
 
 grid_LDOS_bbox_pk_df_choose =grid_LDOS_bbox_pk_df
@@ -1885,7 +1987,7 @@ sns.lineplot(data = grid_LDOS_bbox_df,
 sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
                         x ='bias_mV',
                         y = ch_l_name+'_offset',
-                        #s = 30,
+                        s = 40,
                         alpha = 0.5,
                         palette ="rocket",
                         hue = xr_data_l_pks.line_direction,
@@ -1895,7 +1997,7 @@ sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
 ax.set_xlabel('Bias (mV)')   
 #ax.set_ylabel(ch_l_name+'_offset')   
 ax.set_ylabel('LDOS')   
-ax.set_xlim(-1.0,1.0)
+ax.set_xlim(-1.5,1.5)
 #ax.set_ylim(-1.0E-9,6.0E-9)
 
 ax.vlines(x = 0, ymin=ax.get_ylim()[0],  ymax=ax.get_ylim()[1], linestyles='dashed',alpha = 0.5, color= 'k')
@@ -1963,10 +2065,10 @@ plt.show()
 # Choose peak labels
 ###############
 
-grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==7)
+grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N)
                                                     #|(grid_LDOS_bbox_pk_df.y_kmeans  == 2)
                                                     #|(grid_LDOS_bbox_pk_df.y_kmeans  == 0)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == 3)]
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
 
 
 ##########
@@ -1989,7 +2091,7 @@ sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
                         x ='bias_mV',
                         y = ch_l_name+'_offset',
                         #s = 30,
-                        alpha = 0.5,
+                        alpha = 0.8,
                         palette ="rocket",
                         hue = xr_data_l_pks.line_direction,
                         
@@ -1998,10 +2100,10 @@ sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
 ax.set_xlabel('Bias (mV)')   
 #ax.set_ylabel(ch_l_name+'_offset')   
 ax.set_ylabel('LDOS')   
-ax.set_xlim(-1,1)
+ax.set_xlim(-1.6,1.6)
 #ax.set_ylim(-1.0E-9,6.0E-9)
 
-ax.vlines(x = 0, ymin=ax.get_ylim()[0],  ymax=ax.get_ylim()[1], linestyles='dashed',alpha = 0.5, color= 'k')
+ax.vlines(x = 0, ymin=ax.get_ylim()[0],  ymax=ax.get_ylim()[1], linestyles='dashed',alpha = 0.7, color= 'k')
 
 handles0, labels0 = ax.get_legend_handles_labels()
 handles1 = handles0[:int(len(handles0)//2)]
@@ -2021,22 +2123,22 @@ original_legend = ax.get_legend()
 
 
 SCgaps_negD1 = r'-$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == 7].mean().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1N].mean().bias_mV,
     2) ) +r'$\pm$' +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == 7].std().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1N].std().bias_mV,
     2) )  +' mV'
 
 SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == 3].mean().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].mean().bias_mV,
     2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == 3].std().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].std().bias_mV,
     2) )    +' mV'
 
 
 SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1
 # Add text with a bounding box using ax.annotate
-text_x = -0.5
-text_y = 0.10E-9
+text_x = 0.85
+text_y = -0.1E-9
 
 bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", alpha=0.6)
 
@@ -2877,6 +2979,177 @@ grid_LDOS_2diff_sg_dps_pad_mV = peak_mV_3Dxr(grid_LDOS_2diff_sg_dps_pad, ch= 'LD
 grid_LDOS_rot['LDOS_pk_mV'] = (grid_LDOS_2diff_sg_dps_pad_mV.LDOS_fb_peaks_mV * grid_LDOS_rot.LDOS_fb).astype(float)
 grid_LDOS_rot
 # extract the peak positions 
+# -
+
+peaks_df = grid_LDOS_rot.LDOS_pk_mV.to_dataframe()
+
+# +
+#################
+##  Classify peaks by using k-mean clustering 
+####################
+
+from sklearn.cluster import KMeans
+
+X = grid_LDOS_bbox_pk_df[['bias_mV', 'LDOS_fb_offset']].values
+
+kmeans = KMeans(n_clusters=15)
+kmeans.fit(X)
+
+y_kmeans = kmeans.predict(X)
+grid_LDOS_bbox_pk_df['y_kmeans']=y_kmeans
+
+#grid_LDOS_bbox_pk_df_choose
+plt.scatter(X[:, 0], X[:, 1], c=y_kmeans, s=50, cmap='viridis')
+plt.show()
+# -
+
+# ##  chat gpt 활요한 3차원 peak k mean clustering 테스트 
+# * 아직 까지는 잘 안됐음 
+#
+
+# +
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+import xarray as xr
+
+
+
+# +
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+import xarray as xr
+
+# Xarray 데이터 생성 (임의의 3차원 데이터 예시)
+data =peaks_df
+# Xarray 데이터를 NumPy 배열로 변환
+numpy_data = data.values  # NumPy 배열로 변환
+
+# PCA를 사용하여 3차원 데이터를 2차원으로 축소 (첫 번째와 두 번째 차원 선택)
+pca = PCA(n_components=2)
+reduced_data = pca.fit_transform(numpy_data.reshape(-1, 9))  # 3차원 데이터를 2차원으로 변환
+
+# K-Means 클러스터링 수행
+n_clusters = 3
+kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(reduced_data)
+
+# 클러스터 할당 정보를 얻습니다.
+cluster_labels = kmeans.labels_
+
+
+
+# +
+# K-Means 클러스터링 수행
+n_clusters = 3
+kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(reduced_data)
+
+# 클러스터 할당 정보를 얻습니다.
+cluster_labels = kmeans.labels_
+
+
+
+# +
+# 3D 그래프 생성
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+
+# 클러스터링 결과를 3D 그래프에 표시
+for cluster in range(n_clusters):
+    ax.scatter(numpy_data[cluster_labels == cluster, 0],
+               numpy_data[cluster_labels == cluster, 1],
+               numpy_data[cluster_labels == cluster, 2],
+               label=f'Cluster {cluster + 1}')
+
+ax.set_xlabel('X 축')
+ax.set_ylabel('Y 축')
+ax.set_zlabel('Z 축')
+ax.set_title('K-Means 클러스터링 결과')
+
+# 범례 표시
+ax.legend()
+
+# 그래프 표시
+plt.show()
+
+# -
+
+sns.set_style("whitegrid")
+sns.lineplot(data = grid_LDOS.LDOS_fb.to_dataframe().reset_index(), x='bias_mV', y='LDOS_fb', errorbar=('ci', 0.95)) 
+
+
+####################33
+# melt dataframe for avg plot
+#####################
+LDOS_fb_0_1_df_area_df_melt = LDOS_fb_0_1_df.melt(id_vars = ['Y','X', 'bias_mV'], value_vars = ['LDOS_Area0','LDOS_Area1'] )
+LDOS_fb_0_1_df_area_df_melt.columns = ['Y','X','bias_mV', 'Area','LDOS']
+LDOS_fb_0_1_df_area_df_melt
+
+LDOS_fb_0_1_df_area_df_melt.Area[LDOS_fb_0_1_df_area_df_melt.Area == 'LDOS_Area0' ] = 'Cs'
+LDOS_fb_0_1_df_area_df_melt.Area[LDOS_fb_0_1_df_area_df_melt.Area == 'LDOS_Area1' ] = 'Kagome'
+LDOS_fb_0_1_df_area_df_melt
+
+grid_LDOS_th.LDOS_fb_th_label
+
+grid_LDOS_th.LDOS_fb_th_label==0
+
+isns.imshow (grid_LDOS_th.LDOS_fb_th_label==0, cbar = False,cmap = 'greys')#ax = ax[0],) 
+
+
+# +
+fig,ax = plt.subplots(ncols = 2, figsize=(6,3))
+isns.imshow (grid_LDOS_th.LDOS_fb_th_label.isnull(), ax = ax[0], cbar = False) 
+
+ax[0].set_title('Cs or V')
+
+sns.lineplot(LDOS_fb_0_1_df_area_df_melt,x = 'bias_mV', y = 'LDOS', ax = ax[1], hue = 'Area')
+#sns.lineplot( x  =LDOS_fb__1_df, data = LDOS_fb__1_df, ax = ax[2])
+#sns.lineplot(grid_LDOS_th.LDOS_fb.where( grid_LDOS_th.LDOS_fb_th_label !=0 ).mean(["X","Y"]).to_dataframe(), ax = ax[2], label ='1')
+#ax[1].set_title('LDOS at Area 0 or 1')
+plt.tight_layout()
+plt.show()
+
+# +
+grid_LDOS_bbox_pk_df
+
+#################
+##  Classify peaks by using k-mean clustering 
+####################
+
+from sklearn.cluster import KMeans
+
+X = grid_LDOS_bbox_pk_df[['bias_mV', 'LDOS_fb_offset']].values
+
+kmeans = KMeans(n_clusters=15)
+kmeans.fit(X)
+
+y_kmeans = kmeans.predict(X)
+grid_LDOS_bbox_pk_df['y_kmeans']=y_kmeans
+
+#grid_LDOS_bbox_pk_df_choose
+plt.scatter(X[:, 0], X[:, 1], c=y_kmeans, s=50, cmap='viridis')
+plt.show()
+
+# +
+grid_LDOS_bbox_pk_df
+#sns.color_palette("tab10")
+ax = sns.scatterplot( data  = grid_LDOS_bbox_pk_df, x = 'bias_mV', y = 'LDOS_fb_offset', hue = y_kmeans, palette='deep' , legend ='full', color="tab10")
+
+
+# Calculate centroids of each group
+centroids = grid_LDOS_bbox_pk_df.groupby("y_kmeans")[["bias_mV", "LDOS_fb_offset"]].mean()
+
+# Annotate centroids
+for idx, centroid in centroids.iterrows():
+    ax.annotate(idx, (centroid["bias_mV"], centroid["LDOS_fb_offset"]),
+                textcoords="offset points", xytext=(0,10), ha='center', fontsize=20, fontweight='bold')
+
+ax.legend_.remove()
+
+plt.show()
 # -
 
 np.save('LDOS008_001_pk_zm_mV.npy', grid_LDOS_rot.LDOS_pk_mV.where((grid_LDOS_rot.bias_mV> - 3.6)& (grid_LDOS_rot.bias_mV<3.6), drop = True).to_numpy())

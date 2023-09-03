@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -2002,7 +2002,10 @@ def grid3D_line_avg_pks (xr_data, average_in =  'X',
                          distance = None,
                          threshold = None,
                          prominence=None, width=None,
-                         padding_value = np.nan) : 
+                         padding_value = np.nan,
+                         window_length=7,
+                         polyorder=3
+                        ) : 
 
     if average_in ==  'X':
         mean_direction = 'X'
@@ -2027,8 +2030,10 @@ def grid3D_line_avg_pks (xr_data, average_in =  'X',
         find_peaks_xr(
             savgolFilter_xr(
                 savgolFilter_xr(
-                    xr_data_l.differentiate(coord='bias_mV')
-                ).differentiate(coord='bias_mV')
+                    xr_data_l.differentiate(coord='bias_mV'),
+                    window_length=window_length,polyorder=polyorder,
+                ).differentiate(coord='bias_mV'),
+                window_length=window_length,polyorder=polyorder
             )*-1, height =height, distance = distance, threshold = threshold, prominence=prominence, width=width), 
         padding_value = padding_value)
     if average_in ==  'X':
