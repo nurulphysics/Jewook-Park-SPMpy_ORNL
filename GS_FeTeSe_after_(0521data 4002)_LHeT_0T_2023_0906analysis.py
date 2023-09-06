@@ -2001,8 +2001,6 @@ grid_LDOS_rot  = grid_LDOS
 # -
 
 
-grid_LDOS 
-
 grid_LDOS_sg= savgolFilter_xr(grid_LDOS_rot, window_length=51, polyorder=7)
 
 # +

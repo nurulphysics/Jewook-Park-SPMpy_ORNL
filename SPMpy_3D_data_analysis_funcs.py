@@ -969,7 +969,7 @@ def hv_bbox_topo_avg (xr_data, bound_box , ch = 'topography' ):
 # only after bbox setup & streaming bound_box positions
 
 
-def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
+def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5, show_LDOS_avg = False ):
     '''
     ** only after Bound box settup with hV 
     
@@ -1016,12 +1016,18 @@ def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
 
     xr_data_bbox = xr_data.where (xr_data.X[x_bounds_msk] + xr_data.Y[y_bounds_msk])
     
-    #isns.reset_defaults()
-    #isns.set_image(origin = 'lower')
+    isns.reset_defaults()
+    isns.set_image(cmap= 'viridis',origin = 'lower')
     # isns image directino setting 
-
+    if show_LDOS_avg == True :
+        ncols = 3
+        
+    else : 
+        ncols = 2 
+        
+    
     fig,axs = plt.subplots (nrows = 1,
-                            ncols = 3,
+                            ncols = ncols,
                             figsize = (12,4))
 
     isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
@@ -1045,15 +1051,17 @@ def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
                                edgecolor = 'pink',
                                fill=False,
                                lw=2,
-                               alpha=1))
+                               alpha=0.5))
 
     isns.imshow(xr_data_bbox[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
                 ax =  axs[1],
                 robust = True)
-    sns.lineplot(x = "bias_mV",
-                 y = ch, 
-                 data = xr_data_bbox.to_dataframe(),
-                 ax = axs[2])
+    if show_LDOS_avg == True :   
+        sns.lineplot(x = "bias_mV",
+                     y = ch, 
+                     data = xr_data_bbox.to_dataframe(),
+                     ax = axs[2])
+    else : pass
     #plt.savefig('grid011_bbox)p.png')
     plt.show()
     # 3 figures will be diplayed, original image with Bbox area, BBox area zoom, BBox averaged STS
@@ -2591,106 +2599,6 @@ def hv_fft_bbox_crop (xr_data, bound_box , ch = 'LDOS_fb_fft' ,slicing_bias_mV =
     return xr_data_bbox
 
 
-# +
-# function for drawing bbox averaged STS 
-# only after bbox setup & streaming bound_box positions
-
-
-def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
-    '''
-    ** only after Bound box settup with hV 
-    
-        import holoviews as hv
-        from holoviews import opts
-        hv.extension('bokeh')
-
-        grid_channel_hv = hv.Dataset(grid_3D.I_fb)
-
-        # bias_mV slicing
-        dmap_plane  = ["X","Y"]
-        dmap = grid_channel_hv.to(hv.Image,
-                                  kdims = dmap_plane,
-                                  dynamic = True )
-        dmap.opts(colorbar = True,
-                  cmap = 'bwr',
-                  frame_width = 200,
-                  aspect = 'equal')#.relabel('XY plane slicing: ')
-
-        grid_channel_hv_image  = hv.Dataset(grid_3D.I_fb.isel(bias_mV = 0)).relabel('for BBox selection : ')
-
-        bbox_points = hv.Points(grid_channel_hv_image).opts(frame_width = 200,
-                                                            color = 'k',
-                                                            aspect = 'equal',
-                                                            alpha = 0.1,                                   
-                                                            tools=['box_select'])
-
-        bound_box = hv.streams.BoundsXY(source = bbox_points,
-                                        bounds=(0,0,0,0))
-        dmap*bbox_points
-        
-        add grid_topo line profile 
-
-    
-    '''
-    import holoviews as hv
-    from holoviews import opts
-    hv.extension('bokeh')
-    # slicing bias_mV = 5 mV
-    
-    #bound_box.bounds
-    x_bounds_msk = (xr_data.X > bound_box.bounds[0] ) & (xr_data.X < bound_box.bounds[2])
-    y_bounds_msk = (xr_data.Y > bound_box.bounds[1] ) & (xr_data.Y < bound_box.bounds[3])
-
-    xr_data_bbox = xr_data.where (xr_data.X[x_bounds_msk] + xr_data.Y[y_bounds_msk])
-    
-    isns.reset_defaults()
-    isns.set_image(cmap= 'viridis',origin = 'lower')
-    # isns image directino setting 
-
-    fig,axs = plt.subplots (nrows = 1,
-                            ncols = 3,
-                            figsize = (12,4))
-
-    isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
-                ax =  axs[0],
-                robust = True)
-
-    # add rectangle for bbox 
-    from matplotlib.patches import Rectangle
-    # find index value of bound box 
-
-    Bbox_x0 = np.abs((xr_data.X-bound_box.bounds[0]).to_numpy()).argmin()
-    Bbox_y0 = np.abs((xr_data.Y-bound_box.bounds[1]).to_numpy()).argmin()
-    Bbox_x1 = np.abs((xr_data.X-bound_box.bounds[2]).to_numpy()).argmin()
-    Bbox_y1 = np.abs((xr_data.Y-bound_box.bounds[3]).to_numpy()).argmin()
-    Bbox = Bbox_x0,Bbox_y0,Bbox_x1,Bbox_y1
-    # substract value, absolute value with numpy, argmin returns index value
-
-    # when add rectangle, add_patch used index 
-    axs[0].add_patch(Rectangle((Bbox_x0 , Bbox_y0 ), 
-                               Bbox_x1 -Bbox_x0 , Bbox_y1-Bbox_y0,
-                               edgecolor = 'pink',
-                               fill=False,
-                               lw=2,
-                               alpha=0.5))
-
-    isns.imshow(xr_data_bbox[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
-                ax =  axs[1],
-                robust = True)
-    sns.lineplot(x = "bias_mV",
-                 y = ch, 
-                 data = xr_data_bbox.to_dataframe(),
-                 ax = axs[2])
-    #plt.savefig('grid011_bbox)p.png')
-    plt.show()
-    # 3 figures will be diplayed, original image with Bbox area, BBox area zoom, BBox averaged STS
-    return xr_data_bbox, fig
-    # plot STS at the selected points 
-    # use the seaborn (confident interval : 95%) 
-    # sns is figure-level function 
-
-
-# -
 # ### Not Used Previous (WORKING)Functions (FOR 3d ONLY)
 
 '''
