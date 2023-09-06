@@ -2064,8 +2064,8 @@ average_in= 'Y'
 grid_LDOS_bbox_pk  = grid3D_line_avg_pks( grid_LDOS_bbox ,
                                          ch_l_name ='LDOS_fb',
                                          average_in= average_in,
-                                         distance =6, 
-                                         width= 6 ,
+                                         distance =1, 
+                                         width= 1 ,
                                          threshold = 0.1E-12, 
                                          padding_value= 0,
                                          prominence=0.1E-12,
@@ -2094,7 +2094,7 @@ from sklearn.cluster import KMeans
 
 X = grid_LDOS_bbox_pk_df[['bias_mV', 'LDOS_fb_offset']].values
 
-kmeans = KMeans(n_clusters= 8)
+kmeans = KMeans(n_clusters= 5)
 kmeans.fit(X)
 
 y_kmeans = kmeans.predict(X)
@@ -2137,13 +2137,13 @@ plt.show()
 #############
 # Choose peak labels
 ###############
-delta1N = 0
-#delta2N = 3
-#delta2P = 2
-delta1P = 2
+delta1N = 2
+delta2N = 0
+delta2P = 3
+delta1P = 1
 grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N)
-                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == delta2N)
-                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == delta2P)
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2N)
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2P)
                                                     |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
 
 
@@ -2210,7 +2210,7 @@ SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
     2) ) +r'$\pm$'  +str(round (
     grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].std().bias_mV,
     2) )    +' mV'
-"""
+
 SCgaps_negD2 = r'-$\Delta_{2}$ = '+ str(round (
     grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2N].mean().bias_mV,
     2) ) +r'$\pm$'  +str(round (
@@ -2222,8 +2222,9 @@ SCgaps_posD2 =r'+$\Delta_{2}$ = '+ str(round (
     2) ) +r'$\pm$'  +str(round (
     grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].std().bias_mV,
     2) )    +' mV'
-"""
-SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1#+'\n' + SCgaps_negD2+'\n'+ SCgaps_posD2
+
+
+SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1+'\n' + SCgaps_negD2+'\n'+ SCgaps_posD2
 # Add text with a bounding box using ax.annotate
 text_x = 2.5
 text_y = 0.05E-10
