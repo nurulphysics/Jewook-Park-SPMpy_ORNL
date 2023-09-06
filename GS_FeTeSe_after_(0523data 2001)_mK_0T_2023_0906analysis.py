@@ -41,7 +41,7 @@
 #     * Cleaving at RT in Load-Lock chamber 
 #     * UHV condition (<5E-10Torr)
 # ## **Tip: Electro chemically etched Ni Tip:  <font color= Blue, font size="5" > Spin-Polarized </font>  tip**
-# ## Measurement temp: 40m 
+# ## Measurement temp: LHe T 4.2K 
 #
 # ## <font color= red > No Magnetic field 0T (Z)   </font>
 # -
@@ -256,7 +256,7 @@ files_df[files_df.type=='3ds']#.file_name.iloc[0]
 # 3D data 
 #grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[2])
 # line data
-grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[0])
+grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[2])
 grid_xr
 
 # ## 1-2.2. Separate topography / gird_3D (I_fb, LIX_fb)
@@ -979,7 +979,7 @@ plt.show()
 
 #bias_mV_slices= [ -5,-4, -3, -2, -1, 0, 1, 2, 3, 4,5][::-1]
 #bias_mV_slices= [ -0.8, -0.6,-0.4,-0.2, 0,0.2,0.4, 0.6, 0.8][::-1]
-bias_mV_slices = np.arange(-2.4,2.41,0.4)
+bias_mV_slices = np.arange(-10,10.1,1)
 #bias_mV_slices = np.arange(-1.0,1.1, 0.3)
 print ( bias_mV_slices)
 bias_mV_slices_v = grid_LDOS.bias_mV.sel(bias_mV = bias_mV_slices, method = "nearest").values#.round(2)
@@ -1007,7 +1007,7 @@ plt.show()
 
 # +
 ### check the difference between  peak poistion & zerobias position 
-bias_mv_a = -0.3
+bias_mv_a = -2
 bias_mV_b = 0
 
 grid_LDOS_a_b = grid_LDOS.sel(bias_mV = bias_mv_a, method = "nearest") -  grid_LDOS.sel(bias_mV = bias_mV_b, method = "nearest") 
@@ -1159,7 +1159,7 @@ g.set_title('Zero bias conductance map')
 plt.show()
 
 #grid_LDOS.LDOS_fb.where(grid_LDOS.bias_mV >0.4).where(grid_LDOS.bias_mV <0.6).mean(dim="bias_mV").plot(robust=True)
-LDOS_range_mV =  (-0.3,-0)
+LDOS_range_mV =  (-2,-1)
 grid_LDOS_ref = grid_LDOS.LDOS_fb.where(
     grid_LDOS.bias_mV >LDOS_range_mV[0],drop = True).where(
     grid_LDOS.bias_mV <LDOS_range_mV[1],drop = True)#.plot(robust=True)
@@ -2001,7 +2001,7 @@ grid_LDOS_rot  = grid_LDOS
 # -
 
 
-grid_LDOS_sg= savgolFilter_xr(grid_LDOS_rot, window_length=51, polyorder=5)
+grid_LDOS_sg= savgolFilter_xr(grid_LDOS_rot, window_length=51, polyorder=7)
 
 # +
 ##################################
@@ -2064,11 +2064,11 @@ average_in= 'Y'
 grid_LDOS_bbox_pk  = grid3D_line_avg_pks( grid_LDOS_bbox ,
                                          ch_l_name ='LDOS_fb',
                                          average_in= average_in,
-                                         distance =5, 
-                                         width= 5 ,
-                                         threshold = 0.1E-11, 
+                                         distance =1, 
+                                         width= 1 ,
+                                         threshold = 0.1E-12, 
                                          padding_value= 0,
-                                         prominence=0.1E-11,
+                                         prominence=0.1E-12,
                                          window_length=11,
                                          polyorder=5
                                         ) 
@@ -2077,8 +2077,8 @@ grid_LDOS_bbox_pk
 grid_LDOS_bbox_pk_slct, grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df, fig = grid_lineNpks_offset(
     grid_LDOS_bbox_pk,
     ch_l_name ='LDOS_fb',
-    plot_y_offset= 4E-11,
-    peak_LIX_min = 0.1E-11,
+    plot_y_offset= 4E-12,
+    peak_LIX_min = 0.1E-12,
     legend_title = "Y (nm)")
 
 plt.show()
@@ -2094,7 +2094,7 @@ from sklearn.cluster import KMeans
 
 X = grid_LDOS_bbox_pk_df[['bias_mV', 'LDOS_fb_offset']].values
 
-kmeans = KMeans(n_clusters= 11)
+kmeans = KMeans(n_clusters= 5)
 kmeans.fit(X)
 
 y_kmeans = kmeans.predict(X)
@@ -3029,8 +3029,7 @@ grid_LDOS
 grid_LDOS_fft  = twoD_FFT_xr(grid_LDOS_crop)
 grid_LDOS_fft.freq_X.spacing 
 
-# ### Still rotation fft is not properly working. . hv plot only shows spots, not rotated image. 
-#
+# ### Still l
 
 grid_LDOS_fft_rot =  rotate_3D_fft_xr(np.log(grid_LDOS_fft), -19)
 isns.imshow( grid_LDOS_fft_rot.sel(freq_bias_mV= 0, method= 'nearest').LDOS_fb_fft, robust=True, perc = (86,99))
