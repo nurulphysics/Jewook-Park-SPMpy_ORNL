@@ -536,7 +536,7 @@ def twoD_FFT_xr (xr_data,
                  true_phase=True, 
                  true_amplitude=False, 
                  plus_one = 1,
-                 complex_output = False):
+                 complex_output = True):
     """
     Calcuate Fast Fourier Transform. (with xrft package )
     # in case of xarray data format 
@@ -582,7 +582,12 @@ def twoD_FFT_xr (xr_data,
                                 true_amplitude = true_amplitude))+plus_one)
         else: 
             print('complex128 after fft')
-            xr_data_after_fft[ch_map+'_fft']  = xrft.xrft.fft(xr_data[ch_map])
+            #xr_data_after_fft[ch_map+'_fft']  = xrft.xrft.fft(xr_data[ch_map])
+            print('complex128 after fft+ np.abs after fft')
+            xr_data_after_fft[ch_map+'_fft']  = np.abs(xrft.xrft.fft(xr_data[ch_map]))
+            # use the complex128 for the freq_X spacing 
+            #  np.abs for magnitude
+            
     # 'true_phase=True,true_amplitude=False'
     # true amplitude : False ==> for log scale 
     # true phase : True 2D --> for proper fft   
@@ -942,8 +947,7 @@ isns.imshow(z_LIX_fNb_xr_butterworth.z_fwd_df_butterworth, origin = "lower")
 '''
 
 
-# -
-
+# + [markdown] jp-MarkdownHeadingCollapsed=true
 # # 5. rank filteres functions 
 # > To use "skimage.filters.rank ", input data type should be uint8/uint16
 # > * $\to$ image_to_grayscale (convert image as (0,255))
@@ -963,6 +967,7 @@ isns.imshow(z_LIX_fNb_xr_butterworth.z_fwd_df_butterworth, origin = "lower")
 # >* eg) xrdata =  **filter_gs_mean_xr** (xrdata_gs)
 # >* eg) xrdata =  **filter_gs_substract_mean_xr** (xrdata)
 #
+# -
 
 # # 6. Image Thresholding functions 
 # > *  Threshold selections + boolean 
@@ -1017,10 +1022,67 @@ def filter_convert2grayscale(xrdata):
 
     """
     xrdata_prcssd = xrdata.copy()
+
+    if isinstance(xrdata, xr.core.dataarray.DataArray):
+        print("The given xr object is a DataArray.")
+        for ch_name in  xrdata:
+            xrdata_prcssd.values = skimage.img_as_ubyte(skimage.exposure.rescale_intensity(
+                    xrdata, in_range='image', out_range=(0,1)))
+        
+    elif isinstance(xrdata, xr.core.dataset.Dataset):
+        print("The given xr object is a DataSet.")
+        for ch_name in  xrdata:
+            xrdata_prcssd[ch_name].values = skimage.img_as_ubyte(
+                skimage.exposure.rescale_intensity(
+                    xrdata[ch_name])*0.5+0.5)
+
+    else:
+        print("The given xr object is neither a DataArray nor a DataSet.")
+    
+    return xrdata_prcssd
+#############################################
+# test example
+#z_LIX_fNb_xr_gs = xrdata_to_grayscale(z_LIX_fNb_xr)
+#isns.imshow(z_LIX_fNb_xr_gs.z_fwd_df,
+#    origin = "lower")
+############################################
+# now we can do the skimage.rank.filters 
+###########################################
+#
+###########################################
+#  apply mean rank.mean to xr_gs
+##
+'''
+Old version. 
+New version includes a xarray DataSet Data Array instance checking 
+
+
+def filter_convert2grayscale(xrdata): 
+    """
+    convert data values in to grayscale
+    to use " skimage.rank.filters "
+
+    
+    Parameters
+    ----------
+    xrdata : Xarray DataSet TYPE
+        DESCRIPTION.
+            input data type is float 32
+        
+        
+
+    Returns
+    -------
+    xrdata_prcssd : Xarray DataSet TYPE
+        DESCRIPTION.
+        out data type is unsigned 8 bit (0-255)
+
+    """
+    xrdata_prcssd = xrdata.copy()
     for ch_name in  xrdata:
         xrdata_prcssd[ch_name].values = skimage.img_as_ubyte(
             skimage.exposure.rescale_intensity(
-                xrdata[ch_name])*0.5+0.5)
+                xrdata[ch_name], in_range='image', out_range='dtype')*0.5+0.5)
     return xrdata_prcssd
 #############################################
 # test example
@@ -1067,6 +1129,7 @@ def filter_gs_mean_xr(xrdata_gs,disk_radious=10):
     return xrdata_gs_prcssd
 #############################################
 
+'''
 
 ###########################################
 #  apply mean rank.mean to xr_gs
@@ -2486,7 +2549,34 @@ def line_profile2_xr(xrdata, l_pf_start, l_pf_end, ch_N = [0,2], profile_width =
 # -
 
 
+# +
+### Add 
+# isinstance() 함수를 사용하여 객체의 클래스를 확인하고, 해당 클래스에 따라 DataArray와 DataSet을 구분하고 그 수를 출력
 
+
+import xarray as xr
+
+# Create or obtain the given xarray object (e.g., xr_obj).
+
+if isinstance(xr_obj, xr.core.dataarray.DataArray):
+    # If xr_obj is a DataArray, there is one DataArray.
+    print("The given xr object is a DataArray with 1 DataArray.")
+    
+elif isinstance(xr_obj, xr.core.dataset.Dataset):
+    # If xr_obj is a DataSet, count the number of DataArrays it contains.
+    num_dataarrays = len(xr_obj.data_vars)
+    
+    if num_dataarrays == 1:
+        print("The given xr object is a DataSet with 1 DataArray.")
+    else:
+        print(f"The given xr object is a DataSet with {num_dataarrays} DataArrays.")
+        
+else:
+    print("The given xr object is neither a DataArray nor a DataSet.")
+
+    
+    
+# -
 
 # ### threshold map + labeling area 
 #
@@ -2495,6 +2585,8 @@ def line_profile2_xr(xrdata, l_pf_start, l_pf_end, ch_N = [0,2], profile_width =
 # select one map & apply thresholds
 # choose reference map using bias_mV,
 # otsu threholde. 
+
+
 
 
 def th_otsu_roi_label_2D_xr(xr_data, bias_mV_th = 0, threshold_flip = True):

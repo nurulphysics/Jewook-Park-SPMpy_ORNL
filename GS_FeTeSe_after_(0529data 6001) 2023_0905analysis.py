@@ -28,13 +28,20 @@
 # # Experimental Conditions 
 #
 # ## Data Acquistion date 
-# * 2023 0814
+# * 2023 0530 
+# ## **Sample**
+# * <font color= Blue, font size="5" > $FeTe_{0.55}Se_{0.45}$ (new batch) </font> 
+#     * Cleaving: @ UHV Loadlock chamber, Room temp.
+#     
+# ## **Tip** 
+# *  PtIr normal metal tip
+# ## Measurement temp
+# * mK (< 40 mK)
 #
-# ## **Sample** :<font color= White, font size="5" > $CsV_{3}Sb_{5}, 4^{th}$ 82K cleaving </font> 
-#     * Cleaving at 82K at LT cleaving holder in EX chamber
+#     * Cleaving at RT in Load-Lock chamber 
 #     * UHV condition (<5E-10Torr)
 # ## **Tip: Electro chemically etched W Tip# 11  normal metal tip**
-# ## Measurement temp: mK ( $/approx$ 40 mK)
+# ## Measurement temp: 40 mK 
 #
 # ## <font color= red > No Magnetic field 0T (Z)   </font>
 # -
@@ -249,7 +256,7 @@ files_df[files_df.type=='3ds']#.file_name.iloc[0]
 # 3D data 
 #grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[2])
 # line data
-grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[6])
+grid_xr = grid2xr(files_df[files_df.type=='3ds'].file_name.iloc[0])
 grid_xr
 
 # ## 1-2.2. Separate topography / gird_3D (I_fb, LIX_fb)
@@ -297,6 +304,18 @@ grid_xr.topography.plot(robust= True)
 
 # ### after crop, reassgin coords  X&Y 
 
+'''
+
+grid_xr = grid_xr.assign_coords({'X': grid_xr.X -  grid_xr.X.min()})
+grid_xr = grid_xr.assign_coords({'Y': grid_xr.Y -  grid_xr.Y.min()})
+
+
+grid_xr_crop = grid_xr_crop.assign_coords({'X': grid_xr.X -  grid_xr.X.min()})
+grid_xr_crop = grid_xr_crop.assign_coords({'Y': grid_xr.Y -  grid_xr.Y.min()})
+
+'''
+
+
 # +
 ###########################
 # unfinished grid data 
@@ -307,21 +326,25 @@ grid_xr.topography.plot(robust= True)
 grid_topo #= grid_topo.where (grid_topo.Y<1.25E-9, drop = True)
 grid_3D #= grid_3D.where (grid_3D.Y<1.25E-9, drop = True)
 
+# -
 
+
+grid_topo
 
 # +
 
 ##################################
 #  Padding & dirft correlation 
 ##################################
-
+"""
 grid_xr_pad = padding_xr(grid_xr,  padding_dim = 'X', padding_shape=10)
 grid_xr_pad.LIX_fb.sel(bias_mV=0).plot(robust = True)
 
 
-grid_xr_drft_y = drift_compensation_y_topo_crrltn(grid_xr)
+grid_xr_drft_y = drift_compensation_y_topo_crrltn(grid_xr_pad)
 grid_xr_drft_y_pad = padding_xr ( grid_xr_drft_y, padding_dim='Y', padding_shape= 10)
-
+"""
+# it is not incompeted dataset but still an issue on drift_compensation_y_topo
 
 
 # +
@@ -330,7 +353,7 @@ grid_xr_drft_y_pad = padding_xr ( grid_xr_drft_y, padding_dim='Y', padding_shape
 # & crop boundary area 
 ##########################
 
-
+"""
 grid_xr_drft_y_rot = rotate_3D_xr ( grid_xr_drft_y_pad, rotation_angle= -4)
 # shape of X & Y need to be the same 
 grid_xr_drft_y_rot = grid_xr_drft_y_rot.where(
@@ -340,13 +363,219 @@ grid_xr_drft_y_rot = grid_xr_drft_y_rot.where(
     grid_xr_drft_y_rot.Y <4.5E-9, drop = True)
 
 grid_xr_drft_y_rot.topography.plot(robust = True)
-
+"""
 # -
-
+grid_xr
 
 
 # +
-grid_3D_gap = grid_3D_SCgap(grid_xr_drft_y_rot, tolerance_I =2E-11,tolerance_LIX =2E-11, apply_SGfilter = True,  window_length = 7, polyorder = 3)
+def grid_3D_SCgap(xr_data,tolerance_I =  0.2E-11, tolerance_LIX = 1E-11,
+                  apply_SGfilter = True,  window_length = 21, polyorder = 3, 
+                  bias_mV_set_zero = True):
+    '''
+    gap definition need to be improved for Superconducting sample data 
+    after Bias_mV_offset_avg_test 
+    I_avg --> I_0 = bias_mV_0 
+    
+    output : I, dI/dV, LDOS_fb, SCgap_map,SCgap_pos, SCgap_neg
+    find SCgap : based on plateau finding --> plateau map + ZBCP map 
+    
+    
+    '''
+    # get plateau area 
+    # tolerance for I & LIX
+    
+    xr_data_prcssd = xr_data.copy(deep = True)
+                   
+    xr_data_prcssd['dIdV'] = xr_data_prcssd.I_fb.differentiate(
+        coord = 'bias_mV')
+    # numerically calculated dI/dV from I_fb
+    LIX_ratio = xr_data_prcssd.dIdV / xr_data_prcssd.LIX_fb
+       
+    xr_data_prcssd['LIX_unit_calc'] = np.abs(
+        LIX_ratio.mean())*xr_data_prcssd.LIX_fb
+    # LIX unit calibration 
+    # pA unit : lock-in result 
+    # LIX_unit_calc : calibrated as [A/V] unit for dI/dV
+       
+    
+    print('Find plateau in I &LIX each points')
+    if apply_SGfilter == True :
+        print('import savgolFilter_xr in advance' )
+        xr_data_sg = savgolFilter_xr(xr_data_prcssd, 
+                                     window_length = window_length,
+                                     polyorder = polyorder)
+
+    else : 
+        print ('without SavgolFilter_xr, check outliers')
+        xr_data_sg = xr_data_prcssd
+
+    if 'I_fb' in xr_data_prcssd.data_vars : 
+        I_fb_plateau = abs(xr_data_sg['I_fb']) <= tolerance_I 
+    else :
+        I_fb_plateau = abs(xr_data_sg['LIX_fb']) <= tolerance_LIx  
+        print ('No I_fb channel, use LIX instead')
+
+    if 'LIX_unit_calc' in xr_data_prcssd.data_vars : 
+        LIX_fb_plateau = abs(xr_data_sg['LIX_unit_calc']) <= tolerance_LIX * np.abs( LIX_ratio.mean())
+    else: 
+        LIX_fb_plateau = abs(xr_data_sg['LIX_fb']) <= tolerance_LIX 
+        print ('test_ No LIX_unit_calc channel, use LIX instead for tolerance_LIX check-up')
+
+    I_LIX_plateau = I_fb_plateau*LIX_fb_plateau
+    # pixels in X,Y, bias_mV  intersection of plateau
+
+    xr_data_sg['I_LIX_plateau']=I_LIX_plateau
+    #I_LIX_plateau is where  plateau within I & LIX tolerance 
+    # I tolerance is near Zero Current 
+    # LIX tolerance is more flat area with in I tolerance area 
+    # Energy gap near Zero bias  
+    
+    
+    ################################################
+    # adjust bias_mV at zero first
+    ####################################################
+    if bias_mV_set_zero == True:
+        # select I_LIX_plateau is False ==> non-zero conductance at zero biase) 
+        # apply boolean to I_fb & areal average 
+        # find base at Zero Current 
+
+        non_zero_condunctance_avg  = xr_data_sg.I_fb.where(~xr_data_sg.I_LIX_plateau.sel(bias_mV=0, method='nearest')).mean(dim = ['X','Y'])
+        # find bias_mV value in where the close to zero current 
+        # xr_data_prcssd.bias_mV[np.abs(non_zero_condunctance_avg).argmin()]
+        if non_zero_condunctance_avg.sum() ==0 : 
+            pass
+        else:
+            # error message with "All-NaN slice encountered"
+            #bias_mV_shift = grid_3D_gap.bias_mV -  grid_3D_gap.bias_mV[np.abs(non_zero_condunctance_avg).argmin()]
+            print("bias_mV zero where I_fb =0" , xr_data_sg.bias_mV[np.abs(non_zero_condunctance_avg).argmin()].values)
+            # use assign_coords to change bias_mV values 
+            xr_data_prcssd = xr_data_sg.assign_coords (bias_mV = xr_data_sg.bias_mV -  xr_data_sg.bias_mV[np.abs(non_zero_condunctance_avg).argmin()])
+            print("zero bias_mV: shifted")
+    else: pass
+    
+    
+    ##################################################
+    ### find gap position again after bias_mV adjusted 
+    #####################################################
+    
+    if 'I_fb' in xr_data_prcssd.data_vars : 
+        I_fb_plateau = abs(xr_data_prcssd['I_fb']) <= tolerance_I 
+    else :
+        I_fb_plateau = abs(xr_data_prcssd['LIX_fb']) <= tolerance_LIx  
+        print ('No I_fb channel, use LIX instead')
+
+    if 'LIX_unit_calc' in xr_data_prcssd.data_vars : 
+        LIX_fb_plateau = abs(xr_data_prcssd['LIX_unit_calc']) <= tolerance_LIX *np.abs( LIX_ratio.mean())
+    else: 
+        LIX_fb_plateau = abs(xr_data_prcssd['LIX_fb']) <= tolerance_LIX 
+        print ('No LIX_unit_calc channel, use LIX instead for tolerance_LIX check-up')
+
+    I_LIX_plateau = I_fb_plateau*LIX_fb_plateau
+    # pixels in X,Y, bias_mV  intersection of plateau
+
+    xr_data_prcssd['I_LIX_plateau'] = I_LIX_plateau
+    
+    
+    # out figure
+    gap_pos0_I = xr_data_prcssd.I_fb.where(I_LIX_plateau).idxmax(dim='bias_mV')
+    gap_neg0_I = xr_data_prcssd.I_fb.where(I_LIX_plateau).idxmin(dim='bias_mV')
+    gap_mapI = gap_pos0_I-gap_neg0_I
+    
+    
+    
+    xr_data_prcssd['gap_pos0_I'] = gap_pos0_I
+    xr_data_prcssd['gap_neg0_I'] = gap_neg0_I
+    xr_data_prcssd['gap_mapI'] = gap_mapI
+    #########
+    
+    gap_pos0_LIX_mV = xr_data_prcssd.LIX_unit_calc.where(I_LIX_plateau).idxmax(dim='bias_mV')
+    gap_neg0_LIX_mV = xr_data_prcssd.LIX_unit_calc.where(I_LIX_plateau).idxmin(dim='bias_mV')
+   
+    # I_LIX_plateau  가운데  max min 을 골라냈음. (전체가운데 0가 포함하는지는 아직 모름. 
+    
+    
+    xr_data_prcssd['gap_pos0_LIX'] = gap_pos0_LIX_mV
+    xr_data_prcssd['gap_neg0_LIX'] = gap_neg0_LIX_mV
+    
+    #######################################################
+    # filtering gap_pos0_LIX <--- filtering 'neg' values 
+    # filtering gap_neg0_LIX <--- filtering 'pos' values 
+    #########
+    #gap_neg0_LIX_neg = xr_data_prcssd.gap_neg0_LIX.where(xr_data_prcssd.gap_neg0_LIX>0).isnull()
+    # True ==>   neg == neg
+    gap_neg0_LIX_neg = xr_data_prcssd.gap_neg0_LIX.where(gap_neg0_LIX_mV<0)
+    xr_data_prcssd['gap_neg0_LIX']= gap_neg0_LIX_neg
+    # assign again 
+    
+    
+    #gap_pos0_LIX_pos = xr_data_prcssd.gap_pos0_LIX.where(xr_data_prcssd.gap_pos0_LIX<0).isnull()
+    # True ==>  pos == pos
+    gap_pos0_LIX_pos = xr_data_prcssd.gap_pos0_LIX.where(xr_data_prcssd.gap_pos0_LIX>0)
+    xr_data_prcssd['gap_pos0_LIX']=gap_pos0_LIX_pos
+    # assign again 
+    
+    
+    plateau_map_LIX = (~gap_pos0_LIX_pos.isnull())&(~gap_neg0_LIX_neg.isnull())
+    #     plateau_map_LIX = gap_neg0_LIX_neg & gap_pos0_LIX_pos 
+    
+    
+    # select plateau that contains ZeroBias  ---> plateau_map (zero LIX at zero bias) 
+    xr_data_prcssd['plateau_map_LIX'] = plateau_map_LIX
+    plateau_pos0_LIX = xr_data_prcssd.LIX_unit_calc.where(plateau_map_LIX).idxmax(dim='bias_mV')
+    plateau_neg0_LIX = xr_data_prcssd.LIX_unit_calc.where(plateau_map_LIX).idxmin(dim='bias_mV')
+    # LIX plateau area min & max 
+    #xr_data_prcssd['plateau_pos0_LIX'] = plateau_pos0_LIX
+    #xr_data_prcssd['plateau_neg0_LIX'] = plateau_neg0_LIX
+    
+    xr_data_prcssd['plateau_size_map_LIX'] = gap_pos0_LIX_pos-gap_neg0_LIX_neg
+    # plateau_size_map_LIX
+    xr_data_prcssd['zerobiasconductance'] = xr_data_prcssd.where(~plateau_map_LIX).LIX_unit_calc.sel(bias_mV=0, method = 'nearest')
+    # non zero LIX area zerobias conductance map 
+    
+    #gap_map_LIX = gap_pos0_LIX.where(grid_3D_gap.gap_neg0_LIX>0) - gap_neg0_LIX.where(grid_3D_gap.gap_neg0_LIX<0)
+    
+    ###############################################
+    # in case of  LIX offset (due to phase mismatching?) 
+    """
+    # LIX_fb values less than LIX_min_A => zero value 
+    # LIX_0_pA = LIX_0_pA
+    LIX_0_AV  =  LIX_0_pA * LIX_ratio.mean()
+    # calibrated LIX resolution limit
+    gap_mask_LIX  = np.abs(grid_3D.LIX_unit_calc) < LIX_0_AV
+    # gap_mask_LIX  = np.abs(grid_3D.LIX_fb) > LIX_0_pA
+    # because of the same coefficient ('LIX_ratio.mean()')
+    # range for CBM &VBM is not different between  LIX_unit_calc & LIX_fb
+    # 3D mask 
+
+    LIX_unit_calc_offst = grid_3D.dIdV.where(gap_mask_I).mean()- grid_3D['LIX_unit_calc'].where(gap_mask_I).mean()
+    # possible LIX offset adjust (based on dI/dV calc value)
+    grid_3D_prcssd['LDOS_fb'] = grid_3D.LIX_unit_calc + LIX_unit_calc_offst
+    # assign dI/dV value at I=0  as a reference offset 
+    # grid_3D['LDOS_fb'] is calibrated dIdV with correct unit ([A/V]) for LDOS 
+    # LDOS_fb is proportional to the real LDOS
+    # here we dont consider the matrix element for
+    """
+    
+    #xr_data_prcssd = xr_data_prcssd.drop('gap_pos0_LIX')
+    #xr_data_prcssd = xr_data_prcssd.drop('gap_neg0_LIX')
+    
+    xr_data_prcssd.attrs['I[A]_limit'] = tolerance_I
+    xr_data_prcssd.attrs['LDOS[A/V]_limit'] = tolerance_LIX
+    xr_data_prcssd['LDOS_fb'] = xr_data_prcssd['LIX_unit_calc']
+    # meaningless redundant channel name. 
+    # save the LDOS_fb for other functions. 
+    
+    
+    return xr_data_prcssd
+
+#test
+#grid_3D_gap = grid_3D_Gap(grid_3D)
+#grid_3D_gap
+
+
+# +
+grid_3D_gap = grid_3D_SCgap(grid_xr, tolerance_I =2E-11,tolerance_LIX =2E-11, apply_SGfilter = True,  window_length = 7, polyorder = 3)
 
 
 #grid_3D_gap = grid_3D_SCgap(grid_xr_crop, tolerance_I =2E-11,tolerance_LIX =2E-11, apply_SGfilter = True,  window_length = 7, polyorder = 3)
@@ -359,20 +588,7 @@ grid_3D_gap#.plateau_size_map_LIX.plot()
 grid_LDOS = grid_3D_gap[['LDOS_fb']]
 grid_LDOS
 
-
-# +
-grid_LDOS = grid_LDOS.assign_coords({'X': grid_LDOS.X -  grid_LDOS.X.min()})
-grid_LDOS = grid_LDOS.assign_coords({'Y': grid_LDOS.Y -  grid_LDOS.Y.min()})
-
-
-grid_topo = grid_xr_drft_y_rot.topography
-
-grid_topo = grid_topo.assign_coords({'X': grid_topo.X -  grid_topo.X.min()})
-grid_topo = grid_topo.assign_coords({'Y': grid_topo.Y -  grid_topo.Y.min()})
-
-grid_topo.plot()
 # -
-
 
 # ###  To use Raw data
 
@@ -532,8 +748,8 @@ hv_bias_mV_slicing(grid_LDOS, ch = 'LDOS_fb',frame_width=300)#.opts(clim = (0.0E
 # ####  1.5.2. Y or X slicing 
 
 #hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y')#.opts(clim=(0, 8E-10)) #
-hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X',frame_width=300).opts(clim=(0, 0.5E-9)) #
-#hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y',frame_width=300)#.opts(clim=(0, 1E-9)) # check low intensity area
+#hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'X',frame_width=300).opts(clim=(0, 0.5E-9)) #
+hv_XY_slicing(grid_LDOS, ch = 'LDOS_fb',slicing= 'Y',frame_width=300)#.opts(clim=(0, 1E-9)) # check low intensity area
 #hv_XY_slicing(grid_3D,slicing= 'Y').opts(clim=(0, 1E-11))
 
 
@@ -569,12 +785,11 @@ pn.Column(interact(lambda x:  xr_data.X[x].values, x =sliderX), interact(lambda 
 #grid_LDOS_rot_sg
 
 plot_XYslice_w_LDOS(grid_LDOS, sliderX= sliderX, sliderY= sliderY, ch = 'LDOS_fb',slicing_bias_mV = 0.0)
-
-
-# +
-#plot_Xslice_w_LDOS(grid_LDOS_rot, sliderX= sliderX, ch = 'LDOS_fb',slicing_bias_mV = 0)
-#plt.show()
 # -
+
+plot_Xslice_w_LDOS(grid_LDOS_rot, sliderX= sliderX, ch = 'LDOS_fb',slicing_bias_mV = 0)
+plt.show()
+
 
 # #### 2.3.1.2. STS curve at XY point
 
@@ -704,7 +919,7 @@ bbox_points = hv.Points(xr_data_channel_hv_image).opts(frame_width = frame_width
 
 bound_box = hv.streams.BoundsXY(source = bbox_points,
                                 bounds=(0,0,0,0))
-dmap.opts(clim = (0,1E-9))*bbox_points
+dmap.opts(clim = (0,0.2E-9))*bbox_points
 #dmap.opts()*bbox_points
 
 
@@ -743,10 +958,14 @@ LDOS_fb_area2_df =  bbox_2.LDOS_fb.to_dataframe()
 LDOS_fb_area3_df =  bbox_3.LDOS_fb.to_dataframe()
 LDOS_fb_area4_df =  bbox_4.LDOS_fb.to_dataframe() 
 # xr to dataframe
-LDOS_fb_area1_df.columns = ['Area1(V-Sb)']
-LDOS_fb_area2_df.columns = ['Area2(Cs)']# change df names 
-LDOS_fb_area3_df.columns = ['Area3(V-Sb)']
-LDOS_fb_area4_df.columns = ['Area4(Cs)']# change df names 
+
+column_names = ['Area1','Area2','Area3','Area4']
+
+
+LDOS_fb_area1_df.columns = [column_names[0]]
+LDOS_fb_area2_df.columns = [column_names[1]]# change df names 
+LDOS_fb_area3_df.columns = [column_names[2]]
+LDOS_fb_area4_df.columns = [column_names[3]]# change df names 
 
 LDOS_fb_area_df = pd.concat( [LDOS_fb_area1_df,LDOS_fb_area2_df,LDOS_fb_area3_df,LDOS_fb_area4_df], axis= 1)
 LDOS_fb_area_df# = LDOS_fb_area_df.swaplevel(0,2)
@@ -766,7 +985,7 @@ sns.lineplot(x= 'bias_mV', y = 'LDOS', data = LDOS_fb_area_df_melt, hue ='Area')
 plt.show()
 
 LDOS_fb_area_df = LDOS_fb_area_df.reset_index()
-LDOS_fb_area_df_melt = LDOS_fb_area_df.melt(id_vars = ['Y','X','bias_mV'], value_vars = ['Area1(V-Sb)','Area2(Cs)','Area3(V-Sb)','Area4(Cs)'])
+LDOS_fb_area_df_melt = LDOS_fb_area_df.melt(id_vars = ['Y','X','bias_mV'], value_vars = column_names)
 LDOS_fb_area_df_melt.columns = ['Y','X','bias_mV', 'Area','LDOS']
 LDOS_fb_area_df_melt
 
@@ -967,13 +1186,9 @@ plt.show()
 
 
 #bias_mV_slices= [ -5,-4, -3, -2, -1, 0, 1, 2, 3, 4,5][::-1]
-#bias_mV_slices= [ -2.4, -2, -1, 0, 1, 2, 2.4 ][::-1]
-
-#bias_mV_slices= [-1.4, -1.2, -1, -0.8, -0.6, 0, 0.6, 0.8,1,1.2,1.4][::-1]
-#bias_mV_slices= [-1.0, -0.8, -0.6,-0.4,-0.2, 0,0.2,0.4, 0.6, 0.8,1][::-1]
 #bias_mV_slices= [ -0.8, -0.6,-0.4,-0.2, 0,0.2,0.4, 0.6, 0.8][::-1]
-bias_mV_slices = np.arange(-1.6,1.61,0.2)
-#bias_mV_slices = np.arange(-0.48,0.49,0.12)
+#bias_mV_slices = np.arange(-3.2,3.21,0.2)
+bias_mV_slices = np.arange(-1.0,1.1, 0.2)
 print ( bias_mV_slices)
 bias_mV_slices_v = grid_LDOS.bias_mV.sel(bias_mV = bias_mV_slices, method = "nearest").values#.round(2)
 bias_mV_slices_v
@@ -1000,9 +1215,8 @@ plt.show()
 
 # +
 ### check the difference between  peak poistion & zerobias position 
-bias_mv_a = -0.27
-
-bias_mV_b = 0
+bias_mv_a = -1.5
+bias_mV_b = -0
 
 grid_LDOS_a_b = grid_LDOS.sel(bias_mV = bias_mv_a, method = "nearest") -  grid_LDOS.sel(bias_mV = bias_mV_b, method = "nearest") 
 fig,axs = plt.subplots(1,1, figsize = (4,4))
@@ -1017,8 +1231,11 @@ plt.show()
 np.savetxt('grid_LDOS_a_b_LDOS_fb0-0.2.txt',grid_LDOS_a_b.LDOS_fb.values)
 
 # +
-grid_LDOS_df = grid_LDOS.to_dataframe().unstack()
+#grid_LDOS_df = grid_LDOS.to_dataframe().unstack()
 # xarray to data frame 
+
+grid_LDOS_df = grid_LDOS.where(abs(grid_LDOS.bias_mV)<1.2,drop = True) .to_dataframe().unstack()
+# selected area  xarray to data frame 
 
 #############################################
 # adjust multi index of dataframe as a single index 
@@ -1161,18 +1378,11 @@ g = isns.imshow(grid_LDOS_ref, robust = True)
 g.set_title ('LDOS average between ' +str(LDOS_range_mV))
 
 
-isns.imshow(grid_LDOS.LDOS_fb.where(grid_LDOS.bias_mV >0.27).where(grid_LDOS.bias_mV <0.4).mean(dim="bias_mV"),
-            robust=True, cmap = 'bwr')
-# coherence peak map 
-
 # +
-grid_LDOS.LDOS_fb.where(grid_LDOS.bias_mV >0.4).where(grid_LDOS.bias_mV <0.6).mean(dim="bias_mV").plot(robust=True)
+grid_LDOS_th= th_otsu_roi_label_2D_xr(equalize_hist_xr(grid_LDOS), bias_mV_th = 0,  threshold_flip=False)
+# use Otsu 
 
-grid_LDOS_ref = grid_LDOS.LDOS_fb.where(grid_LDOS.bias_mV >0.4).where(grid_LDOS.bias_mV <0.6).mean(dim="bias_mV")#.plot(robust=True)
-
-
-# +
-grid_LDOS_th= th_multiotsu_roi_label_2D_xr(grid_LDOS, bias_mV_th = 1.0, multiclasses = 5)
+#grid_LDOS_th= th_multiotsu_roi_label_2D_xr(grid_LDOS, bias_mV_th = 1.0, multiclasses = 6)
 # in case of multiotsu
 
 #grid_LDOS_th= th_mean_roi_label_2D_xr(grid_LDOS.rolling(X=4, Y=2,min_periods=2,center= True).mean(),
@@ -1237,8 +1447,8 @@ for labels in slctd_lables:
 plt.show()
 # -
 
-LDOS_fb_0_df = grid_LDOS_th.LDOS_fb.where( grid_LDOS_th.LDOS_fb_th_label ==0 ).mean(["X","Y"]).to_dataframe()
-LDOS_fb_1_df = grid_LDOS_th.LDOS_fb.where( grid_LDOS_th.LDOS_fb_th_label !=0 ).mean(["X","Y"]).to_dataframe()
+LDOS_fb_0_df = grid_LDOS_th.LDOS_fb.where( grid_LDOS_th.LDOS_fb_th_label ==3 ).mean(["X","Y"]).to_dataframe()
+LDOS_fb_1_df = grid_LDOS_th.LDOS_fb.where( grid_LDOS_th.LDOS_fb_th_label !=3 ).mean(["X","Y"]).to_dataframe()
 LDOS_fb_0_1_df = pd.concat( [LDOS_fb_0_df,LDOS_fb_1_df], axis= 1)
 LDOS_fb_0_1_df.columns = ['(Area0)','(Area1)']
 #LDOS_fb_0_1_df
@@ -1292,21 +1502,16 @@ isns.imshow(grid_topo.topography)
 # +
 from skimage.draw import disk
 
-grid_topo_smth =  filter_gaussian_xr ( plane_fit_x_xr(plane_fit_y_xr(grid_topo)), sigma =30)
+grid_topo_smth =  filter_gaussian_xr ( plane_fit_x_xr(plane_fit_y_xr(grid_topo)), sigma =50)
 grid_topo_smth = filter_convert2grayscale ( filter_median_xr(grid_topo_smth))
-
 im = grid_topo_smth.topography.values
-normalized_data = 255 * (im - im.min()) / (im.max() - im.min())
-# Ensure the values are within [0, 255] range
-#normalized_data = np.clip(normalized_data, 0, 255).astype(np.uint8)
-#im
 
-
-im = grid_topo_smth.topography.values
-im_ivt= 255-normalized_data
+im_ivt= 255-im
 im = im_ivt
 
 isns.imshow(im)
+
+isns.imshow(im_ivt)
 
 ###############
 # local max
@@ -1322,10 +1527,10 @@ from skimage import data, img_as_float
 
 # image_max is the dilation of im with a 20*20 structuring element
 # It is used within peak_local_max function
-image_max = ndi.maximum_filter(im_ivt, size=3, mode='constant')
+image_max = ndi.maximum_filter(im_ivt, size=7, mode='constant')
 
 # Comparison between image_max and im to find the coordinates of local maxima
-coordinates = peak_local_max(im_ivt, min_distance=3)
+coordinates = peak_local_max(im_ivt, min_distance=9)
 
 # display results
 fig, axes = plt.subplots(1, 3, figsize=(8, 3), sharex=True, sharey=True)
@@ -1338,7 +1543,7 @@ ax[1].imshow(image_max, cmap=plt.cm.gray)
 ax[1].axis('off')
 ax[1].set_title('Maximum filter')
 
-ax[2].imshow(im, cmap=plt.cm.gray)
+ax[2].imshow(im_ivt, cmap=plt.cm.gray)
 ax[2].autoscale(False)
 ax[2].plot(coordinates[:, 1], coordinates[:, 0], 'r.')
 ax[2].axis('off')
@@ -1347,7 +1552,6 @@ ax[2].set_title('Peak local max')
 fig.tight_layout()
 
 plt.show()
-
 # -
 
 grid_topo_smth
@@ -1822,10 +2026,104 @@ plt.show()
 #hv_bias_mV_slicing(grid_LDOS_rot, ch ='LDOS_fb').opts(clim= (0,1E-10))
 # hv plot & check rotation
 #########################################################################
-# -
 
-grid_xr_crop
+# +
+# function for drawing bbox averaged STS 
+# only after bbox setup & streaming bound_box positions
 
+
+def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
+    '''
+    ** only after Bound box settup with hV 
+    
+        import holoviews as hv
+        from holoviews import opts
+        hv.extension('bokeh')
+
+        grid_channel_hv = hv.Dataset(grid_3D.I_fb)
+
+        # bias_mV slicing
+        dmap_plane  = ["X","Y"]
+        dmap = grid_channel_hv.to(hv.Image,
+                                  kdims = dmap_plane,
+                                  dynamic = True )
+        dmap.opts(colorbar = True,
+                  cmap = 'bwr',
+                  frame_width = 200,
+                  aspect = 'equal')#.relabel('XY plane slicing: ')
+
+        grid_channel_hv_image  = hv.Dataset(grid_3D.I_fb.isel(bias_mV = 0)).relabel('for BBox selection : ')
+
+        bbox_points = hv.Points(grid_channel_hv_image).opts(frame_width = 200,
+                                                            color = 'k',
+                                                            aspect = 'equal',
+                                                            alpha = 0.1,                                   
+                                                            tools=['box_select'])
+
+        bound_box = hv.streams.BoundsXY(source = bbox_points,
+                                        bounds=(0,0,0,0))
+        dmap*bbox_points
+        
+        add grid_topo line profile 
+
+    
+    '''
+    import holoviews as hv
+    from holoviews import opts
+    hv.extension('bokeh')
+    # slicing bias_mV = 5 mV
+    
+    #bound_box.bounds
+    x_bounds_msk = (xr_data.X > bound_box.bounds[0] ) & (xr_data.X < bound_box.bounds[2])
+    y_bounds_msk = (xr_data.Y > bound_box.bounds[1] ) & (xr_data.Y < bound_box.bounds[3])
+
+    xr_data_bbox = xr_data.where (xr_data.X[x_bounds_msk] + xr_data.Y[y_bounds_msk])
+    
+    isns.reset_defaults()
+    isns.set_image(cmap= 'viridis',origin = 'lower')
+    # isns image directino setting 
+
+    fig,axs = plt.subplots (nrows = 1,
+                            ncols = 3,
+                            figsize = (12,4))
+
+    isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
+                ax =  axs[0],
+                robust = True)
+
+    # add rectangle for bbox 
+    from matplotlib.patches import Rectangle
+    # find index value of bound box 
+
+    Bbox_x0 = np.abs((xr_data.X-bound_box.bounds[0]).to_numpy()).argmin()
+    Bbox_y0 = np.abs((xr_data.Y-bound_box.bounds[1]).to_numpy()).argmin()
+    Bbox_x1 = np.abs((xr_data.X-bound_box.bounds[2]).to_numpy()).argmin()
+    Bbox_y1 = np.abs((xr_data.Y-bound_box.bounds[3]).to_numpy()).argmin()
+    Bbox = Bbox_x0,Bbox_y0,Bbox_x1,Bbox_y1
+    # substract value, absolute value with numpy, argmin returns index value
+
+    # when add rectangle, add_patch used index 
+    axs[0].add_patch(Rectangle((Bbox_x0 , Bbox_y0 ), 
+                               Bbox_x1 -Bbox_x0 , Bbox_y1-Bbox_y0,
+                               edgecolor = 'pink',
+                               fill=False,
+                               lw=2,
+                               alpha=0.5))
+
+    isns.imshow(xr_data_bbox[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
+                ax =  axs[1],
+                robust = True)
+    sns.lineplot(x = "bias_mV",
+                 y = ch, 
+                 data = xr_data_bbox.to_dataframe(),
+                 ax = axs[2])
+    #plt.savefig('grid011_bbox)p.png')
+    plt.show()
+    # 3 figures will be diplayed, original image with Bbox area, BBox area zoom, BBox averaged STS
+    return xr_data_bbox, fig
+    # plot STS at the selected points 
+    # use the seaborn (confident interval : 95%) 
+    # sns is figure-level function 
 # +
 grid_LDOS_rot  = grid_LDOS
 
@@ -1872,7 +2170,7 @@ bbox_points = hv.Points(xr_data_channel_hv_image).opts(frame_width = frame_width
 
 bound_box = hv.streams.BoundsXY(source = bbox_points,
                                 bounds=(0,0,0,0))
-dmap.opts(clim = (0,0.8E-9))*bbox_points
+dmap.opts(clim = (0,0.1E-9))*bbox_points
 #dmap*bbox_points
 
 
@@ -1885,9 +2183,9 @@ dmap.opts(clim = (0,0.8E-9))*bbox_points
 
 bound_box
 
-grid_LDOS_bbox,_ = hv_bbox_avg(grid_LDOS_rot, ch ='LDOS_fb',slicing_bias_mV=-0 , bound_box = bound_box)
+isns.set_image(cmap='viridis')
 
-grid_LDOS_bbox
+grid_LDOS_bbox,_ = hv_bbox_avg(grid_LDOS_rot, ch ='LDOS_fb',slicing_bias_mV=-0 , bound_box = bound_box)
 
 # +
 # grid_LDOS_bbox
@@ -1898,20 +2196,20 @@ average_in= 'X'
 grid_LDOS_bbox_pk  = grid3D_line_avg_pks( grid_LDOS_bbox ,
                                          ch_l_name ='LDOS_fb',
                                          average_in= average_in,
-                                         distance =7, 
-                                         width= 7,
+                                         distance =1, 
+                                         width= 1,
                                          threshold = 0.4E-11, 
                                          padding_value= 0,
                                          prominence=0.4E-11,
-                                         window_length=41,
-                                         polyorder=3
+                                         window_length=11,
+                                         polyorder=5
                                         ) 
 grid_LDOS_bbox_pk
 
 grid_LDOS_bbox_pk_slct, grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df, fig = grid_lineNpks_offset(
     grid_LDOS_bbox_pk,
     ch_l_name ='LDOS_fb',
-    plot_y_offset= 8E-11,
+    plot_y_offset= 2E-11,
     peak_LIX_min = 0.4E-11,
     legend_title = "Y (nm)")
 
@@ -1928,7 +2226,7 @@ from sklearn.cluster import KMeans
 
 X = grid_LDOS_bbox_pk_df[['bias_mV', 'LDOS_fb_offset']].values
 
-kmeans = KMeans(n_clusters=9)
+kmeans = KMeans(n_clusters= 9)
 kmeans.fit(X)
 
 y_kmeans = kmeans.predict(X)
@@ -1969,347 +2267,13 @@ sns.set_style("ticks")
 #############
 # Choose peak labels
 ###############
-delta1N = 5
-delta2N = 1
-delta2P = 3 
-delta1P = 4
+delta1N = 
+delta2N = 0
+delta2P = 6
+delta1P = 2
 grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N)
                                                     |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2N)
                                                     |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2P)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
-
-
-#grid_LDOS_bbox_pk_df_choose =grid_LDOS_bbox_pk_df
-
-
-##########
-#grid_LDOS_bbox_pk_df =  grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.bias_mV<=8]
-# remove 0th peak points 
-ch_l_name = 'LDOS_fb'
-xr_data_l_pks = grid_LDOS_bbox_pk
-legend_title = "X (nm)"
-
-fig,ax = plt.subplots(figsize = (5,7))
-
-sns.lineplot(data = grid_LDOS_bbox_df,
-                     x ='bias_mV', 
-                     y = ch_l_name+'_offset',
-                     palette = "rocket",
-                     hue = xr_data_l_pks.line_direction,
-                     ax = ax,legend='full')
-
-sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
-                        x ='bias_mV',
-                        y = ch_l_name+'_offset',
-                        s = 40,
-                        alpha = 0.5,
-                        palette ="rocket",
-                        hue = xr_data_l_pks.line_direction,
-                        
-                        ax = ax,legend='full')
-# legend control!( cut the handles 1/2)
-ax.set_xlabel('Bias (mV)')   
-#ax.set_ylabel(ch_l_name+'_offset')   
-ax.set_ylabel('LDOS')   
-ax.set_xlim(-1.5,1.5)
-#ax.set_ylim(-1.0E-9,6.0E-9)
-
-ax.vlines(x = 0, ymin=ax.get_ylim()[0],  ymax=ax.get_ylim()[1], linestyles='dashed',alpha = 0.5, color= 'k')
-
-handles0, labels0 = ax.get_legend_handles_labels()
-handles1 = handles0[:int(len(handles0)//2)]
-labels1 = [ str(round(float(label)*1E9,2)) for label in labels0[:int(len(labels0)//2)] ] 
-handles2 = handles1[::5][::-1]
-labels2 = labels1[::5][::-1]
-# convert the line length as nm
-print(labels2)
-
-legend_title = legend_title
-
-ax.legend(handles2,   labels2, title = legend_title,loc='upper right', bbox_to_anchor=(1.3, 0.5))
-# use the half of legends (line + scatter) --> use lines only
-
-original_legend = ax.get_legend()
-
-SCgaps_negD1 = r'-$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N].mean().bias_mV,
-    2) ) +r'$\pm$' +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N].std().bias_mV,
-    2) )  +' mV'
-
-SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].std().bias_mV,
-    2) )    +' mV'
-
-SCgaps_negD2 = r'-$\Delta_{2}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2N].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==  delta2N].std().bias_mV,
-    2) )    +' mV'
-SCgaps_posD2 =r'+$\Delta_{2}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].std().bias_mV,
-    2) )    +' mV'
-
-SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1+'\n'+ SCgaps_negD2+'\n'+ SCgaps_posD2
-# Add text with a bounding box using ax.annotate
-text_x = 1
-text_y = -0.1E-9
-
-bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", alpha=0.6)
-
-ax.annotate(SCgaps, xy=(text_x, text_y), xytext=(text_x, text_y ),
-            fontsize=10, color='black', ha='center', va='bottom',
-            bbox=bbox_props, arrowprops=dict(facecolor='black', arrowstyle='->'))
-
-
-plt.show()
-# -
-
-
-
-# +
-##############
-# Fig plot again (remove 0th peak points) 
-
-#grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df
-
-
-#############
-# Choose peak labels
-###############
-
-
-
-grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  == delta1N)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2N)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2P)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
-
-
-
-##########
-#grid_LDOS_bbox_pk_df =  grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.bias_mV<=8]
-# remove 0th peak points 
-ch_l_name = 'LDOS_fb'
-xr_data_l_pks = grid_LDOS_bbox_pk
-legend_title = "X (nm)"
-
-fig,ax = plt.subplots(figsize = (5,7))
-
-sns.lineplot(data = grid_LDOS_bbox_df,
-                     x ='bias_mV', 
-                     y = ch_l_name+'_offset',
-                     palette = "rocket",
-                     hue = xr_data_l_pks.line_direction,
-                     ax = ax,legend='full')
-
-sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
-                        x ='bias_mV',
-                        y = ch_l_name+'_offset',
-                        #s = 30,
-                        alpha = 0.8,
-                        palette ="rocket",
-                        hue = xr_data_l_pks.line_direction,
-                        
-                        ax = ax,legend='full')
-# legend control!( cut the handles 1/2)
-ax.set_xlabel('Bias (mV)')   
-#ax.set_ylabel(ch_l_name+'_offset')   
-ax.set_ylabel('LDOS')   
-ax.set_xlim(-1.6,1.6)
-#ax.set_ylim(-1.0E-9,6.0E-9)
-
-ax.vlines(x = 0, ymin=ax.get_ylim()[0],  ymax=ax.get_ylim()[1], linestyles='dashed',alpha = 0.7, color= 'k')
-
-handles0, labels0 = ax.get_legend_handles_labels()
-handles1 = handles0[:int(len(handles0)//2)]
-labels1 = [ str(round(float(label)*1E9,2)) for label in labels0[:int(len(labels0)//2)] ] 
-handles2 = handles1[::5][::-1]
-labels2 = labels1[::5][::-1]
-# convert the line length as nm
-print(labels2)
-
-legend_title = legend_title
-
-ax.legend(handles2,   labels2, title = legend_title,loc='upper right', bbox_to_anchor=(1.3, 0.6))
-# use the half of legends (line + scatter) --> use lines only
-
-original_legend = ax.get_legend()
-
-
-
-SCgaps_negD1 = r'-$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1N].mean().bias_mV,
-    2) ) +r'$\pm$' +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1N].std().bias_mV,
-    2) )  +' mV'
-
-SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].std().bias_mV,
-    2) )    +' mV'
-
-
-SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1
-# Add text with a bounding box using ax.annotate
-text_x = 0.85
-text_y = 0 
-
-bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", alpha=0.6)
-
-ax.annotate(SCgaps, xy=(text_x, text_y), xytext=(text_x, text_y ),
-            fontsize=12, color='black', ha='center', va='bottom',
-            bbox=bbox_props, arrowprops=dict(facecolor='black', arrowstyle='->'))
-
-
-
-plt.show()
-
-# +
-##############
-# Fig plot again (remove 0th peak points) 
-
-#grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df
-
-
-#############
-# Choose peak labels
-###############
-'''
-delta1N = 1
-delta2N = 5
-delta2P = 2
-delta1P = 6
-'''
-grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  == delta1N)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2N)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2P)
-                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
-
-
-
-##########
-#grid_LDOS_bbox_pk_df =  grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.bias_mV<=8]
-# remove 0th peak points 
-ch_l_name = 'LDOS_fb'
-xr_data_l_pks = grid_LDOS_bbox_pk
-legend_title = "X (nm)"
-
-fig,ax = plt.subplots(figsize = (5,7))
-
-sns.lineplot(data = grid_LDOS_bbox_df,
-                     x ='bias_mV', 
-                     y = ch_l_name+'_offset',
-                     palette = "rocket",
-                     hue = xr_data_l_pks.line_direction,
-                     ax = ax,legend='full')
-
-sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
-                        x ='bias_mV',
-                        y = ch_l_name+'_offset',
-                        #s = 30,
-                        alpha = 0.8,
-                        palette ="rocket",
-                        hue = xr_data_l_pks.line_direction,
-                        
-                        ax = ax,legend='full')
-# legend control!( cut the handles 1/2)
-ax.set_xlabel('Bias (mV)')   
-#ax.set_ylabel(ch_l_name+'_offset')   
-ax.set_ylabel('LDOS')   
-ax.set_xlim(-4.8,4.8)
-#ax.set_ylim(-1.0E-9,5.0E-9)
-
-ax.vlines(x = 0, ymin=ax.get_ylim()[0],  ymax=ax.get_ylim()[1], linestyles='dashed',alpha = 0.7, color= 'k')
-
-handles0, labels0 = ax.get_legend_handles_labels()
-handles1 = handles0[:int(len(handles0)//2)]
-labels1 = [ str(round(float(label)*1E9,2)) for label in labels0[:int(len(labels0)//2)] ] 
-handles2 = handles1[::5][::-1]
-labels2 = labels1[::5][::-1]
-# convert the line length as nm
-print(labels2)
-
-legend_title = legend_title
-
-ax.legend(handles2,   labels2, 
-          title = legend_title,loc='upper right',
-          bbox_to_anchor=(1.3, 0.9))
-# use the half of legends (line + scatter) --> use lines only
-
-original_legend = ax.get_legend()
-
-
-
-
-SCgaps_negD1 = r'-$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N].mean().bias_mV,
-    2) ) +r'$\pm$' +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N].std().bias_mV,
-    2) )  +' mV'
-
-SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].std().bias_mV,
-    2) )    +' mV'
-
-SCgaps_negD2 = r'-$\Delta_{2}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2N].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==  delta2N].std().bias_mV,
-    2) )    +' mV'
-SCgaps_posD2 =r'+$\Delta_{2}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].std().bias_mV,
-    2) )    +' mV'
-
-SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1+'\n'+ SCgaps_negD2+'\n'+ SCgaps_posD2
-# Add text with a bounding box using ax.annotate
-
-text_x = 3
-text_y = 0
-
-bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", alpha=0.6)
-
-ax.annotate(SCgaps, xy=(text_x, text_y), xytext=(text_x, text_y ),
-            fontsize=10, color='black', ha='center', va='bottom',
-            bbox=bbox_props, arrowprops=dict(facecolor='black', arrowstyle='->'))
-
-
-
-"""
-bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", alpha=0.6)
-
-ax.annotate(SCgaps, xy=(text_x, text_y), xytext=(text_x, text_y ),
-            fontsize=12, color='black', ha='center', va='bottom',
-            bbox=bbox_props, arrowprops=dict(facecolor='black', arrowstyle='->'))
-"""
-
-plt.show()
-
-# +
-##############
-# Fig plot again (remove 0th peak points) 
-
-#grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df
-
-
-#############
-# Choose peak labels
-###############
-delta1N = 4
-delta1P =7
-
-grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N)
-                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == 2)
-                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == 0)
                                                     |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
 
 
@@ -2364,31 +2328,32 @@ ax.legend(handles2,   labels2, title = legend_title,loc='upper right', bbox_to_a
 # use the half of legends (line + scatter) --> use lines only
 
 original_legend = ax.get_legend()
-"""
+
 SCgaps_negD1 = r'-$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==10].mean().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N].mean().bias_mV,
     2) ) +r'$\pm$' +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==10].std().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N].std().bias_mV,
     2) )  +' mV'
 
 SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==12].mean().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].mean().bias_mV,
     2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==12].std().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].std().bias_mV,
     2) )    +' mV'
-
+"""
 SCgaps_negD2 = r'-$\Delta_{2}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==17].mean().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].mean().bias_mV,
     2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==17].std().bias_mV,
-    2) )    +' mV'
-SCgaps_posD2 =r'+$\Delta_{2}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==0].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==0].std().bias_mV,
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P ].std().bias_mV,
     2) )    +' mV'
 
-SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1+'\n'+ SCgaps_negD2+'\n'+ SCgaps_posD2
+SCgaps_posD2 =r'+$\Delta_{2}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].mean().bias_mV,
+    2) ) +r'$\pm$'  +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].std().bias_mV,
+    2) )    +' mV'
+"""
+SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1+'\n' #+ SCgaps_negD2+'\n'+ SCgaps_posD2
 # Add text with a bounding box using ax.annotate
 text_x = -0.9
 text_y = 4.5E-9
@@ -2398,10 +2363,9 @@ bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black"
 ax.annotate(SCgaps, xy=(text_x, text_y), xytext=(text_x, text_y ),
             fontsize=12, color='black', ha='center', va='bottom',
             bbox=bbox_props, arrowprops=dict(facecolor='black', arrowstyle='->'))
-"""
+
 
 plt.show()
-
 # +
 ##############
 # Fig plot again (remove 0th peak points) 
@@ -2413,10 +2377,13 @@ plt.show()
 # Choose peak labels
 ###############
 
-grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N)
-                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == 2)
-                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == 0)
+
+
+grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  == delta1N)
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2N)
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2P)
                                                     |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
+
 
 
 ##########
@@ -2491,40 +2458,344 @@ text_y = -0.1E-9
 bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", alpha=0.6)
 
 ax.annotate(SCgaps, xy=(text_x, text_y), xytext=(text_x, text_y ),
+            fontsize=10, color='black', ha='center', va='bottom',
+            bbox=bbox_props, arrowprops=dict(facecolor='black', arrowstyle='->'))
+
+
+
+plt.show()
+
+# +
+##############
+# Fig plot again (remove 0th peak points) 
+
+#grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df
+
+
+#############
+# Choose peak labels
+###############
+delta1N = 1
+#delta2N = 5
+#delta2P = 0
+delta1P = 2
+grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N)
+                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == delta2N)
+                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == delta2P)
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
+
+
+grid_LDOS_bbox_pk_df_choose =grid_LDOS_bbox_pk_df
+
+
+##########
+#grid_LDOS_bbox_pk_df =  grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.bias_mV<=8]
+# remove 0th peak points 
+ch_l_name = 'LDOS_fb'
+xr_data_l_pks = grid_LDOS_bbox_pk
+legend_title = "X (nm)"
+
+fig,ax = plt.subplots(figsize = (5,7))
+
+sns.lineplot(data = grid_LDOS_bbox_df,
+                     x ='bias_mV', 
+                     y = ch_l_name+'_offset',
+                     palette = "rocket",
+                     hue = xr_data_l_pks.line_direction,
+                     ax = ax,legend='full')
+
+sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
+                        x ='bias_mV',
+                        y = ch_l_name+'_offset',
+                        s = 40,
+                        alpha = 0.5,
+                        palette ="rocket",
+                        hue = xr_data_l_pks.line_direction,
+                        
+                        ax = ax,legend='full')
+# legend control!( cut the handles 1/2)
+ax.set_xlabel('Bias (mV)')   
+#ax.set_ylabel(ch_l_name+'_offset')   
+ax.set_ylabel('LDOS')   
+ax.set_xlim(-1.5,1.5)
+#ax.set_ylim(-1.0E-9,6.0E-9)
+
+ax.vlines(x = 0, ymin=ax.get_ylim()[0],  ymax=ax.get_ylim()[1], linestyles='dashed',alpha = 0.5, color= 'k')
+
+handles0, labels0 = ax.get_legend_handles_labels()
+handles1 = handles0[:int(len(handles0)//2)]
+labels1 = [ str(round(float(label)*1E9,2)) for label in labels0[:int(len(labels0)//2)] ] 
+handles2 = handles1[::5][::-1]
+labels2 = labels1[::5][::-1]
+# convert the line length as nm
+print(labels2)
+
+legend_title = legend_title
+
+ax.legend(handles2,   labels2, title = legend_title,loc='upper right', bbox_to_anchor=(1.3, 0.5))
+# use the half of legends (line + scatter) --> use lines only
+
+original_legend = ax.get_legend()
+
+SCgaps_negD1 = r'-$\Delta_{1}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N].mean().bias_mV,
+    2) ) +r'$\pm$' +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N].std().bias_mV,
+    2) )  +' mV'
+
+SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].mean().bias_mV,
+    2) ) +r'$\pm$'  +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].std().bias_mV,
+    2) )    +' mV'
+"""
+SCgaps_negD2 = r'-$\Delta_{2}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].mean().bias_mV,
+    2) ) +r'$\pm$'  +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P ].std().bias_mV,
+    2) )    +' mV'
+
+SCgaps_posD2 =r'+$\Delta_{2}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].mean().bias_mV,
+    2) ) +r'$\pm$'  +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].std().bias_mV,
+    2) )    +' mV'
+"""
+SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1+'\n' #+ SCgaps_negD2+'\n'+ SCgaps_posD2
+# Add text with a bounding box using ax.annotate
+text_x = -0.9
+text_y = 4.5E-9
+
+bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", alpha=0.6)
+
+ax.annotate(SCgaps, xy=(text_x, text_y), xytext=(text_x, text_y ),
             fontsize=12, color='black', ha='center', va='bottom',
+            bbox=bbox_props, arrowprops=dict(facecolor='black', arrowstyle='->'))
+
+
+plt.show()
+# -
+
+
+
+# +
+##############
+# Fig plot again (remove 0th peak points) 
+
+#grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df
+
+
+#############
+# Choose peak labels
+###############
+
+
+
+grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  == delta1N)
+                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == delta2N)
+                                                    #|(grid_LDOS_bbox_pk_df.y_kmeans  == delta2P)
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
+
+
+
+##########
+#grid_LDOS_bbox_pk_df =  grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.bias_mV<=8]
+# remove 0th peak points 
+ch_l_name = 'LDOS_fb'
+xr_data_l_pks = grid_LDOS_bbox_pk
+legend_title = "X (nm)"
+
+fig,ax = plt.subplots(figsize = (5,7))
+
+sns.lineplot(data = grid_LDOS_bbox_df,
+                     x ='bias_mV', 
+                     y = ch_l_name+'_offset',
+                     palette = "rocket",
+                     hue = xr_data_l_pks.line_direction,
+                     ax = ax,legend='full')
+
+sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
+                        x ='bias_mV',
+                        y = ch_l_name+'_offset',
+                        #s = 30,
+                        alpha = 0.8,
+                        palette ="rocket",
+                        hue = xr_data_l_pks.line_direction,
+                        
+                        ax = ax,legend='full')
+# legend control!( cut the handles 1/2)
+ax.set_xlabel('Bias (mV)')   
+#ax.set_ylabel(ch_l_name+'_offset')   
+ax.set_ylabel('LDOS')   
+ax.set_xlim(-1.6,1.6)
+#ax.set_ylim(-1.0E-9,6.0E-9)
+
+ax.vlines(x = 0, ymin=ax.get_ylim()[0],  ymax=ax.get_ylim()[1], linestyles='dashed',alpha = 0.7, color= 'k')
+
+handles0, labels0 = ax.get_legend_handles_labels()
+handles1 = handles0[:int(len(handles0)//2)]
+labels1 = [ str(round(float(label)*1E9,2)) for label in labels0[:int(len(labels0)//2)] ] 
+handles2 = handles1[::5][::-1]
+labels2 = labels1[::5][::-1]
+# convert the line length as nm
+print(labels2)
+
+legend_title = legend_title
+
+ax.legend(handles2,   labels2, title = legend_title,loc='upper right', bbox_to_anchor=(1.3, 0.6))
+# use the half of legends (line + scatter) --> use lines only
+
+original_legend = ax.get_legend()
+
+
+
+SCgaps_negD1 = r'-$\Delta_{1}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1N].mean().bias_mV,
+    2) ) +r'$\pm$' +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1N].std().bias_mV,
+    2) )  +' mV'
+
+SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].mean().bias_mV,
+    2) ) +r'$\pm$'  +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].std().bias_mV,
+    2) )    +' mV'
+
+
+SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1
+# Add text with a bounding box using ax.annotate
+text_x = 0.85
+text_y = -0.1E-9
+
+bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", alpha=0.6)
+
+ax.annotate(SCgaps, xy=(text_x, text_y), xytext=(text_x, text_y ),
+            fontsize=10, color='black', ha='center', va='bottom',
+            bbox=bbox_props, arrowprops=dict(facecolor='black', arrowstyle='->'))
+
+
+
+plt.show()
+
+# +
+##############
+# Fig plot again (remove 0th peak points) 
+
+#grid_LDOS_bbox_df, grid_LDOS_bbox_pk_df
+
+
+#############
+# Choose peak labels
+###############
+
+delta1N = 1
+delta2N = 8
+ZBCP = 3
+delta2P = 7
+delta1P = 2
+
+grid_LDOS_bbox_pk_df_choose = grid_LDOS_bbox_pk_df [(grid_LDOS_bbox_pk_df.y_kmeans  == delta1N)
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2N)
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == ZBCP)
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta2P)
+                                                    |(grid_LDOS_bbox_pk_df.y_kmeans  == delta1P)]
+
+
+
+##########
+#grid_LDOS_bbox_pk_df =  grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.bias_mV<=8]
+# remove 0th peak points 
+ch_l_name = 'LDOS_fb'
+xr_data_l_pks = grid_LDOS_bbox_pk
+legend_title = "X (nm)"
+
+fig,ax = plt.subplots(figsize = (5,7))
+
+sns.lineplot(data = grid_LDOS_bbox_df,
+                     x ='bias_mV', 
+                     y = ch_l_name+'_offset',
+                     palette = "rocket",
+                     hue = xr_data_l_pks.line_direction,
+                     ax = ax,legend='full')
+
+sns.scatterplot(data = grid_LDOS_bbox_pk_df_choose,
+                        x ='bias_mV',
+                        y = ch_l_name+'_offset',
+                        #s = 30,
+                        alpha = 0.8,
+                        palette ="rocket",
+                        hue = xr_data_l_pks.line_direction,
+                        
+                        ax = ax,legend='full')
+# legend control!( cut the handles 1/2)
+ax.set_xlabel('Bias (mV)')   
+#ax.set_ylabel(ch_l_name+'_offset')   
+ax.set_ylabel('LDOS')   
+ax.set_xlim(-3,3)
+#ax.set_ylim(-1.0E-9,5.0E-9)
+
+#ax.vlines(x = 0, ymin=ax.get_ylim()[0],  ymax=ax.get_ylim()[1], linestyles='dashed',alpha = 0.7, color= 'k')
+
+handles0, labels0 = ax.get_legend_handles_labels()
+handles1 = handles0[:int(len(handles0)//2)]
+labels1 = [ str(round(float(label)*1E9,2)) for label in labels0[:int(len(labels0)//2)] ] 
+handles2 = handles1[::5][::-1]
+labels2 = labels1[::5][::-1]
+# convert the line length as nm
+print(labels2)
+
+legend_title = legend_title
+
+ax.legend(handles2,   labels2, 
+          title = legend_title,loc='upper right',
+          bbox_to_anchor=(1.3, 0.9))
+# use the half of legends (line + scatter) --> use lines only
+
+original_legend = ax.get_legend()
+
+
+
+
+SCgaps_negD1 = r'-$\Delta_{1}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N].mean().bias_mV,
+    2) ) +r'$\pm$' +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==delta1N].std().bias_mV,
+    2) )  +' mV'
+
+SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].mean().bias_mV,
+    2) ) +r'$\pm$'  +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta1P].std().bias_mV,
+    2) )    +' mV'
+
+SCgaps_negD2 = r'-$\Delta_{2}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2N].mean().bias_mV,
+    2) ) +r'$\pm$'  +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==  delta2N].std().bias_mV,
+    2) )    +' mV'
+SCgaps_posD2 =r'+$\Delta_{2}$ = '+ str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].mean().bias_mV,
+    2) ) +r'$\pm$'  +str(round (
+    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  == delta2P].std().bias_mV,
+    2) )    +' mV'
+
+
+
+SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1+'\n'+ SCgaps_negD2+'\n'+ SCgaps_posD2
+# Add text with a bounding box using ax.annotate
+
+text_x = 1.8
+text_y = 0.01E-9
+
+bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", alpha=0.6)
+
+ax.annotate(SCgaps, xy=(text_x, text_y), xytext=(text_x, text_y ),
+            fontsize=10, color='black', ha='center', va='bottom',
             bbox=bbox_props, arrowprops=dict(facecolor='black', arrowstyle='->'))
 
 
 
 """
-SCgaps_negD1 = r'-$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==10].mean().bias_mV,
-    2) ) +r'$\pm$' +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==10].std().bias_mV,
-    2) )  +' mV'
-
-SCgaps_posD1 =r'+$\Delta_{1}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==12].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==12].std().bias_mV,
-    2) )    +' mV'
-
-SCgaps_negD2 = r'-$\Delta_{2}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==17].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==17].std().bias_mV,
-    2) )    +' mV'
-SCgaps_posD2 =r'+$\Delta_{2}$ = '+ str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==0].mean().bias_mV,
-    2) ) +r'$\pm$'  +str(round (
-    grid_LDOS_bbox_pk_df[grid_LDOS_bbox_pk_df.y_kmeans  ==0].std().bias_mV,
-    2) )    +' mV'
-
-SCgaps = SCgaps_negD1+'\n'+ SCgaps_posD1+'\n'+ SCgaps_negD2+'\n'+ SCgaps_posD2
-# Add text with a bounding box using ax.annotate
-text_x = -0.9
-text_y = 4.5E-9
-
 bbox_props = dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", alpha=0.6)
 
 ax.annotate(SCgaps, xy=(text_x, text_y), xytext=(text_x, text_y ),
@@ -2867,7 +3138,129 @@ find_plateau_tolarence_values(grid_3D, x_i= sliderX.value  ,  y_j= sliderY.value
 #     * 3.1. lattcies 
 #     
 
-grid_LDOS_fft  = twoD_FFT_xr(grid_LDOS)
+# +
+##########################
+##grid_LDOS  crop 
+##########################
+
+#grid_LDOS_crop = grid_LDOS.where(grid_LDOS.Y > 0.48E-8, drop= True).where(grid_LDOS.X > 0.48E-8, drop= True)
+# check XY size 
+grid_LDOS_crop=grid_LDOS
+
+grid_LDOS_crop.LDOS_fb.sel(bias_mV =0,method ='nearest').plot()
+# -
+
+grid_LDOS_crop
+
+grid_LDOS_fft  = twoD_FFT_xr(grid_LDOS_crop)
+grid_LDOS_fft.freq_X.spacing 
+
+grid_LDOS_fft_rot =  rotate_3D_fft_xr(grid_LDOS_fft, 0)
+
+grid_LDOS_fft.attrs['ref_lattice_a0'] = 0.549E-9
+grid_LDOS_fft.attrs['ref_lattice_k0'] = 1/grid_LDOS_fft.attrs['ref_lattice_a0'] 
+grid_LDOS_fft
+
+# +
+# check the reference peak positions
+# -
+
+xrdata_fft = grid_LDOS_fft
+ref_lattice_a0 = xrdata_fft.attrs['ref_lattice_a0'] # ref_lattice_a0
+ref_lattice_k0 = xrdata_fft.attrs['ref_lattice_k0'] # kspace atomic lattice_k0
+ref_6pts  = ref_lattice_k0 * np.array([[math.cos(pt_i* math.pi/3), 
+                               math.sin(pt_i* math.pi/3)]
+                   for pt_i in range(6)])
+###
+# ref6points as df 
+ref_6pts_df = pd.DataFrame(ref_6pts, columns= ['rx','cy'])
+ref_6pts_df/grid_LDOS_fft.freq_X.spacing 
+# still 0,0 is center 
+
+# +
+fig, axs = plt.subplots (1,1, figsize = (5,5))
+isns.imshow (grid_LDOS_fft_rot.LDOS_fb_fft.sel(freq_bias_mV = 0, method= 'nearest'), robust = True, ax= axs)
+
+# 정육각형을 이루는 6개의 꼭지점 좌표 계산
+# 이미지 크기에 따라 점의 위치를 조정할 수 있습니다.
+
+size_X = len (grid_LDOS_fft_rot.freq_X)
+size_Y = len (grid_LDOS_fft_rot.freq_Y)
+center_x, center_y = size_X // 2, size_Y // 2
+#check center pixel number. 
+
+# 정육각형 꼭지점에 open circle 그리기
+circle_radius = 3    # 원의 반지름 설정
+for point in ref_6pts:
+    x, y = point/grid_LDOS_fft.freq_X.spacing +(center_x, center_y)
+    circle = patches.Circle((x, y), circle_radius, fill=False, edgecolor='red', linewidth=2)
+    axs.add_patch(circle)
+    
+#sns.scatterplot(ref_6pts_df, x = 'rx', y= 'cy', ax = axs)
+plt.show()
+
+# -
+
+grid_LDOS_fft.attrs['ref_lattice_a0'] = 0.549E-9
+grid_LDOS_fft.attrs['ref_lattice_k0'] = 1/grid_LDOS_fft.attrs['ref_lattice_a0'] 
+grid_LDOS_fft
+
+hv_fft_XY_slicing(np.log(grid_LDOS_fft), ch = 'LDOS_fb_fft',slicing= 'freq_Y', frame_width=300)
+
+# +
+## BBOX selection from FFT plot 
+
+# +
+##################################
+# plot Grid_LDOS_fft  & select BBox
+#####################################
+
+import holoviews as hv
+from holoviews import opts
+hv.extension('bokeh')
+
+xr_data = np.log(grid_LDOS_fft_rot)
+ch = 'LDOS_fb_fft'
+frame_width = 400
+
+xr_data_channel_hv = hv.Dataset(xr_data[ch])
+
+# bias_mV slicing
+dmap_plane  = ["freq_X","freq_Y"]
+dmap = xr_data_channel_hv.to(hv.Image,
+                          kdims = dmap_plane,
+                          dynamic = True )
+dmap.opts(colorbar = True,
+          cmap = 'bwr',
+          frame_width = frame_width,
+          aspect = 'equal')#.relabel('XY plane slicing: ')
+
+xr_data_channel_hv_image  = hv.Dataset(xr_data[ch].isel(freq_bias_mV = 0)).relabel('for BBox selection : ')
+
+bbox_points = hv.Points(xr_data_channel_hv_image).opts(frame_width = frame_width,
+                                                    color = 'k',
+                                                    aspect = 'equal',
+                                                    alpha = 0.1,                                   
+                                                    tools=['box_select'])
+
+bound_box_fft = hv.streams.BoundsXY(source = bbox_points,
+                                bounds=(0,0,0,0))
+#dmap.opts(clim = (0,1E-9))*bbox_points
+dmap*bbox_points
+
+
+## hv.DynamicMap( 뒤에는 function 이 와야함), streams  로 해당 영역을 지정.( or 함수의 입력정보 지정) 
+# averaged curve 를 그리기 위해서 해당영역을  xr  에서 average  해야함.. 
+# curve 의 area 로 error bar도 같이 그릴것.. 
+
+
+# -
+
+bound_box_fft
+
+grid_LDOS_fft_bbox = hv_fft_bbox_crop(grid_LDOS_fft_rot, bound_box_fft)
+
+np.log(grid_LDOS_fft_bbox.mean(dim = "freq_X").LDOS_fb_fft).T.plot(robust = True)
 
 help(latticegen.anylattice_gen)
 
@@ -2987,6 +3380,8 @@ def rotate_3D_fft_xr (xrdata, rotation_angle):
 
 grid_LDOS_fft_rot =  rotate_3D_fft_xr(grid_LDOS_fft, 120)
 
+grid_LDOS_fft_rot
+
 
 def hv_fft_bias_mV_slicing(xr_data,ch = 'LDOS_fb_fft',frame_width = 200,cmap = 'bwr'): 
     '''
@@ -3024,6 +3419,7 @@ def hv_fft_bias_mV_slicing(xr_data,ch = 'LDOS_fb_fft',frame_width = 200,cmap = '
     return dmap   
 
 
+grid_LDOS_fft_rot =  rotate_3D_fft_xr(grid_LDOS_fft, 0)
 hv_fft_bias_mV_slicing(np.log(grid_LDOS_fft_rot), ch = 'LDOS_fb_fft',frame_width=300)
 
 
@@ -3127,6 +3523,10 @@ dmap*bbox_points
 
 bound_box_fft
 
+grid_LDOS_fft_bbox = hv_fft_bbox_crop(grid_LDOS_fft_rot, bound_box_fft)
+
+np.log(grid_LDOS_fft_bbox.mean(dim = "freq_Y").LDOS_fb_fft).T.plot(robust = True)
+
 
 def hv_fft_bbox_crop (xr_data, bound_box , ch = 'LDOS_fb_fft' ,slicing_bias_mV = 0.5):
     '''
@@ -3185,10 +3585,6 @@ def hv_fft_bbox_crop (xr_data, bound_box , ch = 'LDOS_fb_fft' ,slicing_bias_mV =
     
     return xr_data_bbox
 
-
-grid_LDOS_fft_bbox = hv_fft_bbox_crop(grid_LDOS_fft_rot, bound_box_fft)
-
-np.log(grid_LDOS_fft_bbox.mean(dim = "freq_Y").LDOS_fb_fft).T.plot(robust = True)
 
 # +
 # function for drawing bbox averaged STS 

@@ -948,8 +948,10 @@ def img2xr (loading_sxm_file, center_offset = False):
     z_LIX_fNb_xr.attrs['image_size'] = [size_x,size_y]
     z_LIX_fNb_xr.attrs['X_spacing'] = step_dx
     z_LIX_fNb_xr.attrs['Y_spacing'] = step_dy    
-    z_LIX_fNb_xr.attrs['freq_X_spacing'] = 1/step_dx
-    z_LIX_fNb_xr.attrs['freq_Y_spacing'] = 1/step_dy
+    #z_LIX_fNb_xr.attrs['freq_X_spacing'] = 1/step_dx
+    #z_LIX_fNb_xr.attrs['freq_Y_spacing'] = 1/step_dy
+    # use xrft with complex128= True, 
+    # freq_X.spacing will provide new axis spacing info
 
     # in case of real X Y ( center & size of XY)
     if center_offset == True:
@@ -1396,9 +1398,11 @@ def grid2xr(griddata_file, center_offset = True):
     grid_xr.attrs['image_size']= [size_x,size_y]
     grid_xr.attrs['X_spacing']= step_dx
     grid_xr.attrs['Y_spacing']= step_dy    
-    grid_xr.attrs['freq_X_spacing']= 1/step_dx
-    grid_xr.attrs['freq_Y_spacing']= 1/step_dy
-
+    #grid_xr.attrs['freq_X_spacing']= 1/step_dx
+    #grid_xr.attrs['freq_Y_spacing']= 1/step_dy
+    # use the complex128 = True for xrft, 
+    # then xrdata_fft.freq_X.spacing 
+    # use the attrs in axis info 
     # in case of real X Y ( center & size of XY)
     if center_offset == True:
         # move the scan center postion in real scanner field of view

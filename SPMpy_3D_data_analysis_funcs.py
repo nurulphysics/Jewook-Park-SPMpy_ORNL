@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.14.5
+#       jupytext_version: 1.15.0
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -309,12 +309,15 @@ def grid_3D_SCgap(xr_data,tolerance_I =  0.2E-11, tolerance_LIX = 1E-11,
         non_zero_condunctance_avg  = xr_data_sg.I_fb.where(~xr_data_sg.I_LIX_plateau.sel(bias_mV=0, method='nearest')).mean(dim = ['X','Y'])
         # find bias_mV value in where the close to zero current 
         # xr_data_prcssd.bias_mV[np.abs(non_zero_condunctance_avg).argmin()]
-
-        #bias_mV_shift = grid_3D_gap.bias_mV -  grid_3D_gap.bias_mV[np.abs(non_zero_condunctance_avg).argmin()]
-        print("bias_mV zero where I_fb =0" , xr_data_sg.bias_mV[np.abs(non_zero_condunctance_avg).argmin()].values)
-        # use assign_coords to change bias_mV values 
-        xr_data_prcssd = xr_data_sg.assign_coords (bias_mV = xr_data_sg.bias_mV -  xr_data_sg.bias_mV[np.abs(non_zero_condunctance_avg).argmin()])
-        print("zero bias_mV: shifted")
+        if non_zero_condunctance_avg.sum() ==0 : 
+            pass
+        else:
+            # error message with "All-NaN slice encountered"
+            #bias_mV_shift = grid_3D_gap.bias_mV -  grid_3D_gap.bias_mV[np.abs(non_zero_condunctance_avg).argmin()]
+            print("bias_mV zero where I_fb =0" , xr_data_sg.bias_mV[np.abs(non_zero_condunctance_avg).argmin()].values)
+            # use assign_coords to change bias_mV values 
+            xr_data_prcssd = xr_data_sg.assign_coords (bias_mV = xr_data_sg.bias_mV -  xr_data_sg.bias_mV[np.abs(non_zero_condunctance_avg).argmin()])
+            print("zero bias_mV: shifted")
     else: pass
     
     
@@ -2277,7 +2280,7 @@ def drift_compensation_y_topo_crrltn (xr_data, y_sub_n=10, padding_shape = 10, d
     '''
     xr_data_topo = xr_data.topography
     xr_data_topo.attrs = xr_data.attrs
-    xr_data_pad = padding_xr(xr_data, padding_dim = 'X', padding_shape= padding_shape)
+    xr_data_pad = padding_xr(xr_data, padding_dim = 'X', padding_shape = padding_shape)
 
     y_N = len (xr_data_topo.Y)
 
@@ -2356,7 +2359,7 @@ def drift_compensation_y_topo_crrltn (xr_data, y_sub_n=10, padding_shape = 10, d
             #xr_data_offset_y_j
 
             # assign_coord as a new calibrated offset-X coords
-            xr_data_offset_ch_y_j_intp = xr_data_offset_ch_y_j.interp(X=xr_data_offset.X)
+            xr_data_offset_ch_y_j_intp = xr_data_offset_ch_y_j.interp(X = xr_data_offset.X)
             #xr_data_offset_y_j_intp
 
             xr_data_pad[ch_name][dict(Y = y_j)]= xr_data_offset_ch_y_j_intp
@@ -2371,6 +2374,323 @@ def drift_compensation_y_topo_crrltn (xr_data, y_sub_n=10, padding_shape = 10, d
     plt.show()
     return xr_data_offset
 
+
+### Xr rotation function 
+# rotate the XY plan in xr data 
+def rotate_3D_fft_xr (xrdata, rotation_angle): 
+    # padding first 
+    for ch_i,ch_name in enumerate (xrdata):
+        if ch_i == 0:  # use only the first channel to calculate a padding size 
+            padding_shape = skimage.transform.rotate(xrdata[ch_name].values.astype('float64'),
+                                                     rotation_angle,
+                                                     resize = True).shape[:2]
+            # After rotation, still 3D shape ->  [:2]
+            
+            padding_xy = (np.array( padding_shape)-np.array(xrdata[ch_name].shape[:2]) +1)/2
+            padding_xy = padding_xy.astype(int)
+    xrdata_pad = xrdata.pad(freq_X=(padding_xy[0],padding_xy[0]), 
+                            freq_Y =(padding_xy[1],padding_xy[1]),
+                            mode='constant',
+                            cval = xrdata.min())
+    if np.array(xrdata_pad[ch_name]).shape[:2] != padding_shape:
+        # in case of xrdata_pad shape is +1 larger than real padding_shape
+        # index 다루는 법  (X)
+        x_spacing = np.diff(xrdata.freq_X).mean()
+        y_spacing = np.diff(xrdata.freq_Y).mean()
+        xrdata.freq_X[0]
+        xrdata.freq_Y[0]
+
+        x_pad_dim = padding_shape[0]#int(padding_xy[0]*2+xrdata.X.shape[0])
+        y_pad_dim = padding_shape[1]#int(padding_xy[0]*2+xrdata.Y.shape[0])
+
+        x_pad_arr =  np.linspace(-1*padding_xy[0]*x_spacing, x_spacing*x_pad_dim,x_pad_dim+1)
+        y_pad_arr =  np.linspace(-1*padding_xy[1]*y_spacing, y_spacing*y_pad_dim,y_pad_dim+1)
+
+        # 0 에서 전체 크기 만큼 padding 한결과를 array 만들고 offset 은 pad_x 만큼 
+        x_pad_arr.shape
+        y_pad_arr.shape
+        xrdata_pad = xrdata_pad.assign_coords( {"freq_X" :  x_pad_arr}).assign_coords({"freq_Y" :  y_pad_arr})
+        xrdata_rot = xrdata_pad.sel(freq_X = xrdata_pad.freq_X[:-1].values, freq_Y = xrdata_pad.freq_Y[:-1].values)
+        print ('padding size != rot_size')
+    else : # np.array(xrdata_pad[ch_name]).shape == padding_shape 
+            # in case of xrdata_pad shape is +1 larger than real padding_shape
+
+        # index 다루는 법  (X)
+        x_spacing = np.diff(xrdata.freq_X).mean()
+        y_spacing = np.diff(xrdata.freq_Y).mean()
+        xrdata.freq_X[0]
+        xrdata.freq_Y[0]
+
+        x_pad_dim = padding_shape[0]#int(padding_xy[0]*2+xrdata.X.shape[0])
+        y_pad_dim = padding_shape[1]#int(padding_xy[0]*2+xrdata.Y.shape[0])
+
+        x_pad_arr =  np.linspace(-1*padding_xy[0]*x_spacing, x_spacing*x_pad_dim,x_pad_dim)
+        y_pad_arr =  np.linspace(-1*padding_xy[1]*y_spacing, y_spacing*y_pad_dim,y_pad_dim)
+
+        # 0 에서 전체 크기 만큼 padding 한결과를 array 만들고 offset 은 pad_x 만큼 
+        x_pad_arr.shape
+        y_pad_arr.shape
+        xrdata_pad = xrdata_pad.assign_coords( {"freq_X" :  x_pad_arr}).assign_coords({"freq_Y" :  y_pad_arr})
+        xrdata_rot = xrdata_pad.copy()      
+        print ('padding size == rot_size')
+    # call 1 channel
+        # use the list_comprehension for bias_mV range
+        # list comprehension is more faster
+        # after rotation, resize = False! , or replacement size error! 
+        # replace the channel(padded) 3D data as a new 3D (rotated )data set 
+
+    for ch in xrdata_pad:
+        xrdata_rot[ch].values = skimage.transform.rotate(xrdata[ch].values.astype('float64'),
+                                                         rotation_angle,
+                                                         cval =xrdata[ch].to_numpy().min(),
+                                                         resize = True)
+    return xrdata_rot
+# ### average X or Y direction jof Grid_3D dataset 
+# * use xr_data (3D)
+# * average_in = 'X' or 'Y'
+# * ch_l_name = channel name for line profile  
+
+def hv_fft_bias_mV_slicing(xr_data,ch = 'LDOS_fb_fft',frame_width = 200,cmap = 'bwr'): 
+    '''
+    input : xarray dataset 
+    output : holoview image
+    
+    * slicing 3D data set in XY plane 
+    * bias_mV is knob
+    
+    default channel  =  'LIX_fb',  or assgin 'I_fb' or 'LDOS_fb'
+    default setting for frame width and cmap  can be changed. 
+    
+    if you need to add color limit 
+        add ".opts(clim=(0, 1E-10))"
+        
+    '''
+    
+    import holoviews as hv
+    from holoviews import opts
+
+    xr_data_hv = hv.Dataset(xr_data[ch])
+
+    hv.extension('bokeh')
+    ###############
+    # bias_mV slicing
+    dmap_plane  = ["freq_X","freq_Y"]
+    dmap = xr_data_hv.to(hv.Image,
+                         kdims = dmap_plane,
+                         dynamic = True )
+    dmap.opts(colorbar = True,
+              cmap = 'bwr',
+              frame_width = frame_width,
+              aspect = 'equal').relabel('XY plane slicing: ')
+    fig = hv.render(dmap)
+    return dmap   
+
+
+def hv_fft_XY_slicing(xr_data,ch = 'LDOS_fb_fft', slicing= 'X', frame_width = 200,cmap = 'bwr'): 
+    '''
+    input : xarray dataset 
+    output : holoview image 
+    
+    
+    * slicing 3D data set in X-bias_mV or Y-bias_mV plane 
+    * X or Y position is knob
+    
+    
+    default channel  =  'LIX_fb',  or assgin 'I_fb'
+    default setting for frame width and cmap  can be changed. 
+    if you need to add color limit 
+     
+    add ".opts(clim=(0, 1E-10))"
+    
+    '''
+    import holoviews as hv
+    from holoviews import opts
+
+    xr_data_hv = hv.Dataset(xr_data[ch])
+
+    hv.extension('bokeh')
+    ###############
+    # bias_mV slicing
+    if slicing == 'freq_Y':
+        dmap_plane  = [ "freq_X","freq_bias_mV"]
+
+        dmap = xr_data_hv.to(hv.Image,
+                             kdims = dmap_plane,
+                             dynamic = True )
+        dmap.opts(colorbar = True,
+                  cmap = 'bwr',
+                  frame_width = frame_width).relabel('X - bias_mV plane slicing: ')
+    else : #slicing= 'freq_X'
+        dmap_plane  = [ "freq_Y","freq_bias_mV"]
+
+        dmap = xr_data_hv.to(hv.Image,
+                             kdims = dmap_plane,
+                             dynamic = True )
+        dmap.opts(colorbar = True,
+                  cmap = 'bwr',
+                  frame_width = frame_width).relabel('Y - bias_mV plane slicing: ')
+    fig = hv.render(dmap)
+    return dmap   
+
+
+def hv_fft_bbox_crop (xr_data, bound_box , ch = 'LDOS_fb_fft' ,slicing_bias_mV = 0.5):
+    '''
+    use cropped BBox area 
+    freq_X or freq_Y  vs  Bias plot 
+    
+    '''
+    import holoviews as hv
+    from holoviews import opts
+    hv.extension('bokeh')
+    # slicing bias_mV = 5 mV
+    
+    #bound_box.bounds
+    x_bounds_msk = (xr_data.freq_X > bound_box.bounds[0] ) & (xr_data.freq_X < bound_box.bounds[2])
+    y_bounds_msk = (xr_data.freq_Y > bound_box.bounds[1] ) & (xr_data.freq_Y < bound_box.bounds[3])
+
+    xr_data_bbox = xr_data.where (xr_data.freq_X[x_bounds_msk] + xr_data.freq_Y[y_bounds_msk])
+    
+    fig,axs = plt.subplots (nrows = 1,
+                            ncols = 2,
+                            figsize = (12,4))
+
+    isns.imshow(xr_data[ch].sel(freq_bias_mV = slicing_bias_mV, method="nearest" ),
+                ax =  axs[0],
+                robust = True)
+
+    # add rectangle for bbox 
+    from matplotlib.patches import Rectangle
+    # find index value of bound box 
+
+    Bbox_x0 = np.abs((xr_data.freq_X-bound_box.bounds[0]).to_numpy()).argmin()
+    Bbox_y0 = np.abs((xr_data.freq_Y-bound_box.bounds[1]).to_numpy()).argmin()
+    Bbox_x1 = np.abs((xr_data.freq_X-bound_box.bounds[2]).to_numpy()).argmin()
+    Bbox_y1 = np.abs((xr_data.freq_Y-bound_box.bounds[3]).to_numpy()).argmin()
+    Bbox = Bbox_x0,Bbox_y0,Bbox_x1,Bbox_y1
+    # substract value, absolute value with numpy, argmin returns index value
+
+    # when add rectangle, add_patch used index 
+    axs[0].add_patch(Rectangle((Bbox_x0 , Bbox_y0 ), 
+                               Bbox_x1 -Bbox_x0 , Bbox_y1-Bbox_y0,
+                               edgecolor = 'red',
+                               fill=False,
+                               lw=2,
+                               alpha=1))
+
+    isns.imshow(xr_data_bbox[ch].sel(freq_bias_mV = slicing_bias_mV, method="nearest" ),
+                ax =  axs[1],
+                robust = True)
+    #sns.lineplot(x = "freq_bias_mV",
+    #             y = ch, 
+    #             data = xr_data_bbox.to_dataframe(),
+    #             ax = axs[2])
+    #plt.savefig('grid011_bbox)p.png')
+    plt.show()
+    
+    
+    return xr_data_bbox
+
+
+# +
+# function for drawing bbox averaged STS 
+# only after bbox setup & streaming bound_box positions
+
+
+def hv_bbox_avg (xr_data, bound_box , ch = 'LIX_fb' ,slicing_bias_mV = 0.5):
+    '''
+    ** only after Bound box settup with hV 
+    
+        import holoviews as hv
+        from holoviews import opts
+        hv.extension('bokeh')
+
+        grid_channel_hv = hv.Dataset(grid_3D.I_fb)
+
+        # bias_mV slicing
+        dmap_plane  = ["X","Y"]
+        dmap = grid_channel_hv.to(hv.Image,
+                                  kdims = dmap_plane,
+                                  dynamic = True )
+        dmap.opts(colorbar = True,
+                  cmap = 'bwr',
+                  frame_width = 200,
+                  aspect = 'equal')#.relabel('XY plane slicing: ')
+
+        grid_channel_hv_image  = hv.Dataset(grid_3D.I_fb.isel(bias_mV = 0)).relabel('for BBox selection : ')
+
+        bbox_points = hv.Points(grid_channel_hv_image).opts(frame_width = 200,
+                                                            color = 'k',
+                                                            aspect = 'equal',
+                                                            alpha = 0.1,                                   
+                                                            tools=['box_select'])
+
+        bound_box = hv.streams.BoundsXY(source = bbox_points,
+                                        bounds=(0,0,0,0))
+        dmap*bbox_points
+        
+        add grid_topo line profile 
+
+    
+    '''
+    import holoviews as hv
+    from holoviews import opts
+    hv.extension('bokeh')
+    # slicing bias_mV = 5 mV
+    
+    #bound_box.bounds
+    x_bounds_msk = (xr_data.X > bound_box.bounds[0] ) & (xr_data.X < bound_box.bounds[2])
+    y_bounds_msk = (xr_data.Y > bound_box.bounds[1] ) & (xr_data.Y < bound_box.bounds[3])
+
+    xr_data_bbox = xr_data.where (xr_data.X[x_bounds_msk] + xr_data.Y[y_bounds_msk])
+    
+    isns.reset_defaults()
+    isns.set_image(cmap= 'viridis',origin = 'lower')
+    # isns image directino setting 
+
+    fig,axs = plt.subplots (nrows = 1,
+                            ncols = 3,
+                            figsize = (12,4))
+
+    isns.imshow(xr_data[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
+                ax =  axs[0],
+                robust = True)
+
+    # add rectangle for bbox 
+    from matplotlib.patches import Rectangle
+    # find index value of bound box 
+
+    Bbox_x0 = np.abs((xr_data.X-bound_box.bounds[0]).to_numpy()).argmin()
+    Bbox_y0 = np.abs((xr_data.Y-bound_box.bounds[1]).to_numpy()).argmin()
+    Bbox_x1 = np.abs((xr_data.X-bound_box.bounds[2]).to_numpy()).argmin()
+    Bbox_y1 = np.abs((xr_data.Y-bound_box.bounds[3]).to_numpy()).argmin()
+    Bbox = Bbox_x0,Bbox_y0,Bbox_x1,Bbox_y1
+    # substract value, absolute value with numpy, argmin returns index value
+
+    # when add rectangle, add_patch used index 
+    axs[0].add_patch(Rectangle((Bbox_x0 , Bbox_y0 ), 
+                               Bbox_x1 -Bbox_x0 , Bbox_y1-Bbox_y0,
+                               edgecolor = 'pink',
+                               fill=False,
+                               lw=2,
+                               alpha=0.5))
+
+    isns.imshow(xr_data_bbox[ch].sel(bias_mV = slicing_bias_mV, method="nearest" ),
+                ax =  axs[1],
+                robust = True)
+    sns.lineplot(x = "bias_mV",
+                 y = ch, 
+                 data = xr_data_bbox.to_dataframe(),
+                 ax = axs[2])
+    #plt.savefig('grid011_bbox)p.png')
+    plt.show()
+    # 3 figures will be diplayed, original image with Bbox area, BBox area zoom, BBox averaged STS
+    return xr_data_bbox, fig
+    # plot STS at the selected points 
+    # use the seaborn (confident interval : 95%) 
+    # sns is figure-level function 
+
+
+# -
 # ### Not Used Previous (WORKING)Functions (FOR 3d ONLY)
 
 '''
