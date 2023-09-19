@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -2549,10 +2549,9 @@ def line_profile2_xr(xrdata, l_pf_start, l_pf_end, ch_N = [0,2], profile_width =
 # -
 
 
-# +
 ### Add 
 # isinstance() 함수를 사용하여 객체의 클래스를 확인하고, 해당 클래스에 따라 DataArray와 DataSet을 구분하고 그 수를 출력
-
+"""
 
 import xarray as xr
 
@@ -2574,9 +2573,8 @@ elif isinstance(xr_obj, xr.core.dataset.Dataset):
 else:
     print("The given xr object is neither a DataArray nor a DataSet.")
 
+"""
     
-    
-# -
 
 # ### threshold map + labeling area 
 #
