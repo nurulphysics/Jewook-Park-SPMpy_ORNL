@@ -210,7 +210,7 @@ import ipywidgets as ipw
 file_chooser = FileChooser("")
 display(file_chooser)
 
-# +
+# + jupyter={"source_hidden": true}
 ##############################
 # After choose the folder    #
 # Files DataFrame            #

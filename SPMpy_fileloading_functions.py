@@ -1852,7 +1852,6 @@ def grid_line2xr(griddata_file, center_offset = True):
     
     return grid_xr
 
-
 # ## <font color=blue>5. Gwyddion 2D image to PANDAS Dataframe or Xarray </font>
 # ### 5.1. gwy_image2df 
 # * convert to df 
@@ -1863,34 +1862,78 @@ def grid_line2xr(griddata_file, center_offset = True):
 #
 
 # +
-def gwy_img2df (gwy_file_name):
-    import pandas as pd
+
+
+def gwy_img2df(gwy_file_name):
+    """
+    Load data from a Gwyddion file and convert it into a Pandas DataFrame.
+
+    Parameters:
+    gwy_file_name (str): The name of the Gwyddion file to be loaded.
+
+    Returns:
+    pd.DataFrame: A Pandas DataFrame containing the data from the Gwyddion file.
+
+    This function loads data from a Gwyddion file specified by `gwy_file_name` and converts
+    it into a Pandas DataFrame. It first checks if the required 'gwyfile' module is installed
+    and installs it if not. The resulting DataFrame contains the data fields from the Gwyddion
+    file.
+    """
     try:
         import gwyfile
     except ModuleNotFoundError:
         warn('ModuleNotFoundError: No module named gwyfile')
         # %pip install gwyfile
         import gwyfile
+
     gwyfile_df = pd.DataFrame(gwyfile.util.get_datafields(gwyfile.load(gwy_file_name)))
-    # convert all gwy file channels to pd.DataFrame
+
+    # Set display format for scientific notation
     pd.set_option('display.float_format', '{:.3e}'.format)
+
     return gwyfile_df
+
 
 #gwy_df = gwyImage2df( file_list_df.file_name[1])
 
-
 # +
-def gwy_df_ch2xr (gwy_df, ch_N=0): 
-    import pandas as pd
-    #convert a channel data to xr DataArray format
-    chN_df = gwy_df.iloc[:,ch_N]
+import pandas as pd
+import xarray as xr
+
+def gwy_df_ch2xr(gwy_df, ch_N=0):
+    """
+    Convert channel data from a Pandas DataFrame to an xarray DataArray format.
+
+    Parameters:
+    gwy_df (pd.DataFrame): The input Pandas DataFrame containing channel data.
+    ch_N (int, optional): The channel index to convert (default is 0).
+
+    Returns:
+    xr.DataArray: An xarray DataArray containing the channel data with proper coordinates.
+    
+    This function takes a DataFrame (`gwy_df`) and an optional `ch_N` parameter to specify
+    which channel to convert into an xarray DataArray format. It reshapes the channel data
+    into a 2D DataFrame, stacks it, and assigns 'Y' and 'X' coordinates with proper scaling.
+    The resulting xarray DataArray is returned.
+    """
+    # Extract the channel data from the DataFrame
+    chN_df = gwy_df.iloc[:, ch_N]
+
+    # Reshape the channel data into a 2D DataFrame and stack it
     chNdf_temp = pd.DataFrame(chN_df.data.reshape((chN_df.yres, chN_df.xres))).stack()
-    chNdf_temp = chNdf_temp.rename_axis (['Y','X'])
-    x_step = chN_df.xreal / chN_df.xres 
-    y_step = chN_df.yreal / chN_df.yres 
+
+    # Rename the indices as 'Y' and 'X'
+    chNdf_temp = chNdf_temp.rename_axis(['Y', 'X'])
+
+    # Calculate the x and y step sizes
+    x_step = chN_df.xreal / chN_df.xres
+    y_step = chN_df.yreal / chN_df.yres
+
+    # Convert the DataFrame to an xarray DataArray
     chNxr = chNdf_temp.to_xarray()
-    chNxr = chNxr.assign_coords(X = chNxr.X.values * x_step, 
-                                Y = chNxr.Y.values * y_step )
+
+    # Assign coordinates 'X' and 'Y' with proper scaling
+    chNxr = chNxr.assign_coords(X=chNxr.X.values * x_step, Y=chNxr.Y.values * y_step)
+
     return chNxr
 
-# gwy_ch_xr = gwy_df_channel2xr(gwy_df, ch_N=3)
