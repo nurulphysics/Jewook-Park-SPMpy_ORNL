@@ -94,7 +94,7 @@ from SPMpy_fileloading_functions import (
     grid_line2xr,
     gwy_df_ch2xr,
     gwy_img2df,
-    img2xr,
+    img2xr,img2xr_Vth
 )
 
 # some packages may be yet to be installed
@@ -287,7 +287,16 @@ from pptx.util import Inches
 from pptx.util import Cm, Pt
 
 for files_name in files_df[files_df.type ==  'sxm'].file_name:
-    spmdata_xr = img2xr(files_name)
+    spmdata_xr = img2xr_Vth(files_name)
+
+ 
+    ###############
+    # multipass was not considered for img2xr_Vth
+    ###############
+   
+    spmdata_xr = spmdata_xr [['z_fwd','z_bwd','Vth_fwd','Vth_bwd', 'LIX_fwd','LIX_bwd']]
+
+    print (spmdata_xr)
 
     # open previously prepared pptx 
     prs = Presentation(pptx_file_name)
@@ -436,8 +445,7 @@ for files_name in files_df[files_df.type ==  'sxm'].file_name:
 
 files_df
 
-spmdata_xr = img2xr(files_name)
-spmdata_xr
+
 
 
 
