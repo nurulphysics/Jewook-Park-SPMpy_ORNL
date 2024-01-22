@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.14.5
+#       jupytext_version: 1.15.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -581,7 +581,7 @@ def twoD_FFT_xr (xr_data,
                                 true_phase = true_phase,
                                 true_amplitude = true_amplitude))+plus_one)
         else: 
-            print('complex128 after fft')
+            ##print('complex128 after fft')
             #xr_data_after_fft[ch_map+'_fft']  = xrft.xrft.fft(xr_data[ch_map])
             print('complex128 after fft+ np.abs after fft')
             xr_data_after_fft[ch_map+'_fft']  = np.abs(xrft.xrft.fft(xr_data[ch_map]))
@@ -598,6 +598,66 @@ def twoD_FFT_xr (xr_data,
 
 
 # -
+
+def get_px_from_fft_coord(xrdata_fft, value, coord = 'freq_X'):
+    """
+    Calculates the pixel ratio of a value in an FFT coordinate.
+
+    Args:
+        xrdata_fft: An xarray DataArray containing the FFT data.
+        coord: The coordinate name of the FFT data.
+        value: The value from the coordinate for which to find the pixel ratio.
+
+    Returns:
+        The pixel ratio, which is a floating-point number between 0 and 1.
+        To draw circle based on 1/r [nm]
+
+    Raises:
+        ValueError: If the given value is out of range.
+    """
+
+    if value > xrdata_fft.coords[coord].max():
+        raise ValueError("Given value is out of range")
+    else: 
+        xrdata_fft_shape = xrdata_fft.dims[coord]
+    return (value / xrdata_fft.coords[coord].max())*xrdata_fft_shape*0.5
+
+
+def fft_masking_near_q0only(xrdata_fft, ch_name = 'z_f_fft', filtering_ratio=[0.2, 3]):
+    """Masks FFT data near q0 in the Fourier plane of a 2D array.
+
+    Args:
+    xrdata_fft: An xarray.DataArray containing the FFT data.
+    filtering_ratio: A list of two floats, representing the inner and outer
+      radius of the masking disk as a fraction of the pixel radius
+      corresponding to q0.
+
+    Returns:
+    An xarray.DataArray containing the masked FFT data.
+    """
+    from skimage.draw import disk
+
+    data_shape = xrdata_fft[list(xrdata_fft.data_vars)[0]].shape
+    mask_disk = np.zeros(data_shape, dtype=np.uint8)
+    disk_center = (data_shape[0] / 2, data_shape[1] / 2)
+
+    # Get the pixel radius corresponding to q0.
+    disk_radius = get_px_from_fft_coord(xrdata_fft, value = xrdata_fft.ref_q0)
+
+    # Create a disk mask centered at q0 with the specified filtering ratio.
+    rr_max, cc_max = disk(disk_center, disk_radius * filtering_ratio[1])
+    mask_disk[rr_max, cc_max] = 1
+
+    rr_min, cc_min = disk(disk_center, disk_radius * filtering_ratio[0])
+    mask_disk[rr_min, cc_min] = 0
+
+    # Add the mask to the xarray.DataArray.
+    xrdata_fft['mask_'] = xrdata_fft[ch_name].copy()
+    xrdata_fft['mask_'].values = mask_disk
+
+    return xrdata_fft
+
+
 
 # ## 3. miscellaneous (data mapping functions + )
 # > data mapping ( closest, nearest, outliers) 
@@ -880,6 +940,7 @@ def filter_unsharp_mask_xr (xrdata,
 
 
 # difference_of_gaussians filtering 
+"""
 def filter_diffofgaussians_xr (xrdata,
                               low_sigma = 5, 
                               high_sigma = 12,
@@ -916,7 +977,81 @@ def filter_diffofgaussians_xr (xrdata,
                 low_sigma = low_sigma,
                 high_sigma = 12 )
     return xrdata_prcssd
+"""
 ############################
+
+import xarray as xr
+import skimage.filters
+
+def filter_diffofgaussians_xr(xrdata, low_sigma=5, high_sigma=12, overwrite=False):
+    """
+    Apply the Difference of Gaussians (DoG) filter to an xarray dataset.
+
+    Parameters
+    ----------
+    xrdata : xr.DataArray or xr.Dataset
+        Input xarray dataset or data array.
+    low_sigma : int, optional (default=5)
+        Standard deviation of the lower-scale Gaussian kernel.
+    high_sigma : int, optional (default=12)
+        Standard deviation of the higher-scale Gaussian kernel.
+    overwrite : bool, optional (default=False)
+        If True, overwrite the original data with the filtered result.
+        If False, create a new channel with the filtered data.
+
+    Returns
+    -------
+    xr.DataArray or xr.Dataset
+        Output xarray dataset or data array with the DoG filter applied.
+
+    Notes
+    -----
+    The Difference of Gaussians (DoG) filter enhances image features by subtracting a
+    lower-scale Gaussian-blurred version (low_sigma) from a higher-scale Gaussian-blurred
+    version (high_sigma) of the original data.
+
+    If 'overwrite' is set to True, the original data is replaced with the filtered result,
+    and if it's False, a new channel with the filtered data is created.
+
+    Example
+    -------
+    # Apply DoG filter to an xarray data array
+    filtered_data = filter_diffofgaussians_xr(xrdata, low_sigma=5, high_sigma=12, overwrite=False)
+    print(filtered_data)
+    """
+    xrdata_prcssd = xrdata.copy()
+    
+    for ch_name in xrdata:
+        filtered_data = skimage.filters.difference_of_gaussians(
+            xrdata[ch_name],
+            low_sigma=low_sigma,
+            high_sigma=high_sigma
+        )
+        
+        if overwrite:
+            xrdata_prcssd[ch_name].values = filtered_data
+        else:
+            xrdata_prcssd[ch_name + '_difference_of_gaussians'] = xrdata[ch_name]
+            xrdata_prcssd[ch_name + '_difference_of_gaussians'].values = filtered_data
+
+    return xrdata_prcssd
+
+
+
+
+
+
+
+
+
+
+#################################
+
+
+
+
+
+
 # Test 
 ###############################
 '''
@@ -1155,6 +1290,8 @@ def filter_gs_substract_mean_xr (xrdata_gs,disk_radious=10):
         DESCRIPTION.
 
     """
+    import skimage.morphology
+    from skimage.morphology import disk
     xrdata_gs_sub_mean = xrdata_gs.copy()
     for ch_name in  xrdata_gs:
         xrdata_gs_sub_mean[ch_name].values = \
@@ -1591,21 +1728,7 @@ def threshold_local_xr (xrdata, block_size_odd = 15, threshold_flip = True):
 # test
 # all works well except li.. (it takes too long time) 
 
-# -
 
-
-# # 7. Image equalization functions 
-# *  **rescale_intensity_xr** function
-#     * image_rescale : robust in isns plot ( eg, plot image percentile 0.02~ 0.98)
-#     * image_rescale to remove outliers
-# *  **equalize_hist_xr** function
-#     * histogram_equalization  : to increase global contrast, re-distribute intensity -> lost highest or lowest infomation 
-#     *  adatptive_equalization : contrast limited adaptive histogram equalization (CLAHE) -> histo_equalization with small blocks. 
-# * **adaptive_equalize_hist_xr** function 
-#     * adjust global histogram $ \to$  **(caution)** it can distort the Z information 
-#     
-# > * <u> to confirm the Z distortion, check the line profile </u>
-#
 
 # +
 
@@ -1699,6 +1822,21 @@ def  adaptive_equalize_hist_xr(xrdata, clip_limit = 0.03):
         xrdata_prcssd[ch_name].values = adap_eq_hist_image
     return xrdata_prcssd
 
+
+# -
+
+# # 7. Image equalization functions 
+# *  **rescale_intensity_xr** function
+#     * image_rescale : robust in isns plot ( eg, plot image percentile 0.02~ 0.98)
+#     * image_rescale to remove outliers
+# *  **equalize_hist_xr** function
+#     * histogram_equalization  : to increase global contrast, re-distribute intensity -> lost highest or lowest infomation 
+#     *  adatptive_equalization : contrast limited adaptive histogram equalization (CLAHE) -> histo_equalization with small blocks. 
+# * **adaptive_equalize_hist_xr** function 
+#     * adjust global histogram $ \to$  **(caution)** it can distort the Z information 
+#     
+# > * <u> to confirm the Z distortion, check the line profile </u>
+#
 
 # + [markdown] id="BRKASaSWwLa8"
 # #  8. Plot 2D images (xr data, seaborn-image)
@@ -1901,7 +2039,7 @@ def plot_2D_xr_fft(xrdata_fft,
         if scan_aspect_ratio != 1: 
             fig.colorbar(isns_channels.get_children()[-2],  
                         fraction = 0.045, 
-                        ax = axs[i])  
+                        ax = axs[i],cmap='viridis')  
         ################################
         # colorbar setting separately
         ################################
@@ -1938,6 +2076,551 @@ def plot_2D_xr_fft(xrdata_fft,
 
 
 # -
+
+def xrdata_plot_r_q_space(xrdata, ch_name= 'z_f',figsize = (6,3), peak_detection_min_distance=20, distance_to_refq0 = 4, add_guidlines = True):
+    from matplotlib_scalebar.scalebar import ScaleBar
+    from matplotlib.patches import Circle
+    xrdata_fft = twoD_FFT_xr(xrdata)
+    xrdata_fft_zm = fft_masking_near_q0only (xrdata_fft,ch_name= ch_name+'_fft', filtering_ratio=[0.3, 2])
+
+    
+    fig, axes = plt.subplots (1,2, figsize = figsize)
+    axs = axes.ravel()
+    if 'z_' in ch_name:
+        cmap_r = 'copper'
+        cmap_q = 'Greys'
+    if 'LIX_' in ch_name:
+        cmap_r = 'bwr'
+        cmap_q = 'Blues'
+    
+    isns.imshow (xrdata[ch_name], robust = True, ax = axs[0],cmap= cmap_r, dx =xrdata[ch_name].X.X_spacing*1E9, units = "nm" )
+    axs[0].set_title(ch_name)
+    isns.imgplot(xrdata_fft[ch_name+'_fft'].where(xrdata_fft.mask_ == 1, drop = True), robust = True, ax = axs[1], cmap= cmap_q)
+    axs[1].set_title(ch_name+' (2D FFT)')
+    scalebar = ScaleBar(dx = xrdata_fft.freq_X.spacing*1E-9,
+                        units = "1/nm",
+                        dimension="si-length-reciprocal",    
+                        color='k'                   )
+    # dx = pixel size for scale bar 
+    # 1E-9 for "1/nm" unit
+    # use separate scalebar option to adjust scale bar color 
+    axs[1].add_artist(scalebar)
+
+
+    image_shape = axs[1].get_images()[0].get_array().shape
+    #get center point from image shape of plot 
+    # or the center is not correct
+    # fft_center  = ( xrdata_fft.z_f_fft.freq_X.shape[0] / 4,  xrdata_fft.z_f_fft.freq_X.shape[0] / 4)
+    # it is not center position
+
+    fft_center  = ( image_shape[0] / 2,  image_shape[0] / 2)
+    q0_r = get_px_from_fft_coord(xrdata_fft, xrdata_fft.ref_q0)
+    circle = Circle(xy = fft_center, radius= float (q0_r), fill= False, edgecolor = 'blue', alpha =0.5)
+
+    #axs[1].add_patch(circle)
+
+    from skimage.feature import peak_local_max
+    im = xrdata_fft[ch_name+'_fft'].where(xrdata_fft.mask_ == 1, drop = True).fillna(0).values
+    #z_f_fft_peak.fillna( z_f_fft_peak.min()).values
+
+    coordinates = peak_local_max(im, min_distance= peak_detection_min_distance)
+    #coordinates ==> find max 
+    # Calculate distances between the points and the disk
+    distances = np.sqrt((coordinates[:, 0] - fft_center[0]) ** 2 + (coordinates[:, 1] - fft_center[1]) ** 2)
+    # distances from fft_center to each points in coordiates 
+
+    # Find the index of the close points
+    distance_to_q0r = distance_to_refq0
+    close_points_indx = np.abs(distances-q0_r.values) < distance_to_q0r
+    #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+    # distance from the circle 
+    closest_point = coordinates[close_points_indx]
+    #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+
+    circle_1 = Circle(xy = fft_center, radius= float (q0_r-distance_to_q0r), linestyle='dotted', fill= False, edgecolor = 'blue', alpha =0.1)
+    circle_2 = Circle(xy = fft_center, radius= float (q0_r+distance_to_q0r), linestyle='dotted', fill= False, edgecolor = 'blue', alpha =0.1)
+
+    if add_guidlines == True : 
+        axs[1].add_patch(circle)
+
+        axs[1].add_patch(circle_1)
+        axs[1].add_patch(circle_2)
+
+        axs[1].scatter(closest_point[:, 1], closest_point[:, 0], c='blue',marker='o', s = 80 , alpha = 0.3)
+    else : pass
+
+    plt.tight_layout()
+    plt.show()
+    return 
+
+
+def xrdata_plot_r_q_space_q(xrdata, ch_name= 'z_f',figsize = (6,3),filtering_ratio=[0.3, 2], peak_detection_min_distance=20, distance_to_refq0 = 4, add_guidlines = True):
+    from matplotlib_scalebar.scalebar import ScaleBar
+    from matplotlib.patches import Circle
+    xrdata_fft = twoD_FFT_xr(xrdata)
+    xrdata_fft_zm = fft_masking_near_q0only (xrdata_fft,ch_name= ch_name+'_fft', filtering_ratio=filtering_ratio)
+
+    
+    fig, axes = plt.subplots (1,2, figsize = figsize)
+    axs = axes.ravel()
+    if 'z_' in ch_name:
+        cmap_r = 'copper'
+        cmap_q = 'Greys'
+    if 'LIX_' in ch_name:
+        cmap_r = 'bwr'
+        cmap_q = 'Blues'
+    
+    isns.imshow (xrdata[ch_name], robust = True, ax = axs[0],cmap= cmap_r, dx =xrdata[ch_name].X.X_spacing*1E9, units = "nm" )
+    axs[0].set_title(ch_name)
+    isns.imgplot(xrdata_fft[ch_name+'_fft'].where(xrdata_fft.mask_ == 1, drop = True), robust = True, ax = axs[1], cmap= cmap_q)
+    axs[1].set_title(ch_name+' (2D FFT)')
+    scalebar = ScaleBar(dx = xrdata_fft.freq_X.spacing*1E-9,
+                        units = "1/nm",
+                        dimension="si-length-reciprocal",    
+                        color='k'                   )
+    # dx = pixel size for scale bar 
+    # 1E-9 for "1/nm" unit
+    # use separate scalebar option to adjust scale bar color 
+    axs[1].add_artist(scalebar)
+    image_shape = axs[1].get_images()[0].get_array().shape
+    #get center point from image shape of plot 
+    # or the center is not correct
+    # fft_center  = ( xrdata_fft.z_f_fft.freq_X.shape[0] / 4,  xrdata_fft.z_f_fft.freq_X.shape[0] / 4)
+    # it is not center position
+    if add_guidlines == True : 
+
+        fft_center  = ( image_shape[0] / 2,  image_shape[0] / 2)
+        q0_r = get_px_from_fft_coord(xrdata_fft, xrdata_fft.ref_q0)
+        circle_q0 = Circle(xy = fft_center, radius= float (q0_r), fill= False, edgecolor = 'blue', alpha =0.5)
+        axs[1].add_patch(circle_q0)
+
+        from skimage.feature import peak_local_max
+        im = xrdata_fft[ch_name+'_fft'].where(xrdata_fft.mask_ == 1, drop = True).fillna(0).values
+        #z_f_fft_peak.fillna( z_f_fft_peak.min()).values
+        coordinates = peak_local_max(im, min_distance= peak_detection_min_distance)
+        #coordinates ==> find max 
+        # Calculate distances between the points and the disk
+        distances = np.sqrt((coordinates[:, 0] - fft_center[0]) ** 2 + (coordinates[:, 1] - fft_center[1]) ** 2)
+        # distances from fft_center to each points in coordiates 
+
+        # Find the index of the close points
+        distance_to_q0r = distance_to_refq0
+        close_points_indx = np.abs(distances-q0_r.values) < distance_to_q0r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point = coordinates[close_points_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        '''
+        circle_1 = Circle(xy = fft_center, radius= float (q0_r-distance_to_q0r), linestyle='dotted', fill= False, edgecolor = 'blue', alpha =0.1)
+        circle_2 = Circle(xy = fft_center, radius= float (q0_r+distance_to_q0r), linestyle='dotted', fill= False, edgecolor = 'blue', alpha =0.1)
+        axs[1].add_patch(circle_1)
+        axs[1].add_patch(circle_2)
+        '''
+        axs[1].scatter(closest_point[:, 1], closest_point[:, 0], c='blue',marker='o', s = 80 , alpha = 0.3)
+
+        # Find the index of the close points
+        q0_sqrt2_r = q0_r*math.sqrt(2)
+        distance_to_q0sqrt2r = distance_to_refq0
+        close_pointsq0_sqrt2r_indx = np.abs(distances-q0_sqrt2_r.values) < distance_to_q0sqrt2r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point_sqrt2 = coordinates[close_pointsq0_sqrt2r_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        axs[1].scatter(closest_point_sqrt2[:, 1], closest_point_sqrt2[:, 0], c='red',marker='o', s = 80 , alpha = 0.4)
+               
+        circle_sqrt2q0 = Circle(xy = fft_center, radius= float (q0_r)*math.sqrt(2), fill= False, linestyle='dotted', edgecolor = 'red', alpha =0.5)
+        axs[1].add_patch(circle_sqrt2q0)
+
+        text_position = [1, 1]
+        axs[1].annotate(r'$q_{0} (Se/Te)$', (text_position[0]*0.05, text_position[1]*0.12), size=10, color="blue", xycoords="axes fraction")#alpha = 0.3,
+                #bbox=dict(facecolor="white", alpha=0.5, edgecolor="black", linewidth=1))
+        axs[1].annotate(r'$ \sqrt{2} q_{0} ( \frac{1}{2}$Fe)', (text_position[0]*0.05, text_position[1]*0.04), size=10, color="red", xycoords="axes fraction")
+
+    else: pass
+    plt.tight_layout()
+    plt.show()
+    return 
+
+
+def xrdata_plot_r_q_space_q2(xrdata, ch_name= 'z_f',figsize = (6,3),filtering_ratio=[0.3, 2], peak_detection_min_distance=20, distance_to_refq0 = 4, add_guidlines = True):
+    from matplotlib_scalebar.scalebar import ScaleBar
+    from matplotlib.patches import Circle
+    xrdata_fft = twoD_FFT_xr(xrdata)
+    xrdata_fft_zm = fft_masking_near_q0only (xrdata_fft,ch_name= ch_name+'_fft', filtering_ratio=filtering_ratio)
+
+    
+    fig, axes = plt.subplots (1,2, figsize = figsize)
+    axs = axes.ravel()
+    if 'z_' in ch_name:
+        cmap_r = 'copper'
+        cmap_q = 'Greys'
+    if 'LIX_' in ch_name:
+        cmap_r = 'bwr'
+        cmap_q = 'Blues'
+    
+    isns.imshow (xrdata[ch_name], robust = True, ax = axs[0],cmap= cmap_r, dx =xrdata[ch_name].X.X_spacing*1E9, units = "nm" )
+    axs[0].set_title(ch_name)
+    isns.imgplot(xrdata_fft[ch_name+'_fft'].where(xrdata_fft.mask_ == 1, drop = True), robust = True, ax = axs[1], cmap= cmap_q)
+    axs[1].set_title(ch_name+' (2D FFT)')
+    scalebar = ScaleBar(dx = xrdata_fft.freq_X.spacing*1E-9,
+                        units = "1/nm",
+                        dimension="si-length-reciprocal",    
+                        color='k'                   )
+    # dx = pixel size for scale bar 
+    # 1E-9 for "1/nm" unit
+    # use separate scalebar option to adjust scale bar color 
+    axs[1].add_artist(scalebar)
+    image_shape = axs[1].get_images()[0].get_array().shape
+    #get center point from image shape of plot 
+    # or the center is not correct
+    # fft_center  = ( xrdata_fft.z_f_fft.freq_X.shape[0] / 4,  xrdata_fft.z_f_fft.freq_X.shape[0] / 4)
+    # it is not center position
+    if add_guidlines == True : 
+
+        fft_center  = ( image_shape[0] / 2,  image_shape[0] / 2)
+        q0_r = get_px_from_fft_coord(xrdata_fft, xrdata_fft.ref_q0)
+        circle_q0 = Circle(xy = fft_center, radius= float (q0_r), fill= False, edgecolor = 'blue', alpha =0.5)
+        axs[1].add_patch(circle_q0)
+
+        from skimage.feature import peak_local_max
+        im = xrdata_fft[ch_name+'_fft'].where(xrdata_fft.mask_ == 1, drop = True).fillna(0).values
+        #z_f_fft_peak.fillna( z_f_fft_peak.min()).values
+        coordinates = peak_local_max(im, min_distance= peak_detection_min_distance)
+        #coordinates ==> find max 
+        # Calculate distances between the points and the disk
+        distances = np.sqrt((coordinates[:, 0] - fft_center[0]) ** 2 + (coordinates[:, 1] - fft_center[1]) ** 2)
+        # distances from fft_center to each points in coordiates 
+
+        # Find the index of the close points
+        distance_to_q0r = distance_to_refq0
+        close_points_indx = np.abs(distances-q0_r.values) < distance_to_q0r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point = coordinates[close_points_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        '''
+        circle_1 = Circle(xy = fft_center, radius= float (q0_r-distance_to_q0r), linestyle='dotted', fill= False, edgecolor = 'blue', alpha =0.1)
+        circle_2 = Circle(xy = fft_center, radius= float (q0_r+distance_to_q0r), linestyle='dotted', fill= False, edgecolor = 'blue', alpha =0.1)
+        axs[1].add_patch(circle_1)
+        axs[1].add_patch(circle_2)
+        '''
+        axs[1].scatter(closest_point[:, 1], closest_point[:, 0], c='blue',marker='o', s = 80 , alpha = 0.3)
+
+        # Find the index of the close points
+        q0_sqrt2_r = q0_r*math.sqrt(2)
+        distance_to_q0sqrt2r = distance_to_refq0
+        close_pointsq0_sqrt2r_indx = np.abs(distances-q0_sqrt2_r.values) < distance_to_q0sqrt2r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point_sqrt2 = coordinates[close_pointsq0_sqrt2r_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        axs[1].scatter(closest_point_sqrt2[:, 1], closest_point_sqrt2[:, 0], c='red',marker='o', s = 80 , alpha = 0.4)
+               
+        circle_sqrt2q0 = Circle(xy = fft_center, radius= float (q0_r)*math.sqrt(2), fill= False, linestyle='dotted', edgecolor = 'red', alpha =0.5)
+        axs[1].add_patch(circle_sqrt2q0)
+
+        text_position = [1, 1]
+        axs[1].annotate(r'$q_{0} (Se/Te)$', (text_position[0]*0.02, text_position[1]*0.24), size=10, color="blue", xycoords="axes fraction")#alpha = 0.3,
+                #bbox=dict(facecolor="white", alpha=0.5, edgecolor="black", linewidth=1))
+        axs[1].annotate(r'$ \sqrt{2} q_{0} ( \frac{1}{2}$Fe)', (text_position[0]*0.02, text_position[1]*0.14), size=10, color="red", xycoords="axes fraction")
+
+        q0_1over_sqrt2_r = q0_r*math.sqrt(2)/2
+        circle_q0_1over_sqrt2 = Circle(xy = fft_center, radius= float (q0_r)*math.sqrt(2)/2, fill= False, linestyle='dotted', edgecolor = 'orange', alpha =0.7)
+        # Find the index of the close points
+        
+        distance_to_q0_1over_sqrt2r = distance_to_refq0
+        close_pointsq0_1over_sqrt2r_indx = np.abs(distances-q0_1over_sqrt2_r.values) < distance_to_q0_1over_sqrt2r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point_1over_sqrt2 = coordinates[close_pointsq0_1over_sqrt2r_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        axs[1].scatter(closest_point_1over_sqrt2[:, 1], closest_point_1over_sqrt2[:, 0], c='orange',marker='o', s = 80 , alpha = 0.4)
+        axs[1].add_patch(circle_q0_1over_sqrt2)
+        
+        axs[1].annotate(r'$ \frac{q_{0}}{\sqrt{2}} ( 2Fe)$', (text_position[0]*0.02, text_position[1]*0.04), size=10, color="orange", xycoords="axes fraction")
+        
+    else: pass
+    plt.tight_layout()
+    plt.show()
+    return 
+
+
+def xrdata_plot_r_q_space_q3(xrdata, ch_name= 'z_f',figsize = (6,3),filtering_ratio=[0.3, 2], peak_detection_min_distance=20, distance_to_refq0 = 4, add_guidlines = True):
+    # add 2Se/Te purple line 
+    from matplotlib_scalebar.scalebar import ScaleBar
+    from matplotlib.patches import Circle
+    xrdata_fft = twoD_FFT_xr(xrdata)
+    xrdata_fft_zm = fft_masking_near_q0only (xrdata_fft,ch_name= ch_name+'_fft', filtering_ratio=filtering_ratio)
+
+    
+    fig, axes = plt.subplots (1,2, figsize = figsize)
+    axs = axes.ravel()
+    if 'z_' in ch_name:
+        cmap_r = 'copper'
+        cmap_q = 'Greys'
+    if 'LIX_' in ch_name:
+        cmap_r = 'bwr'
+        cmap_q = 'Blues'
+    
+    isns.imshow (xrdata[ch_name], robust = True, ax = axs[0],cmap= cmap_r, dx =xrdata[ch_name].X.X_spacing*1E9, units = "nm" )
+    axs[0].set_title(ch_name)
+    isns.imgplot(xrdata_fft[ch_name+'_fft'].where(xrdata_fft.mask_ == 1, drop = True), robust = True, ax = axs[1], cmap= cmap_q)
+    axs[1].set_title(ch_name+' (2D FFT)')
+    scalebar = ScaleBar(dx = xrdata_fft.freq_X.spacing*1E-9,
+                        units = "1/nm",
+                        dimension="si-length-reciprocal",    
+                        color='k'                   )
+    # dx = pixel size for scale bar 
+    # 1E-9 for "1/nm" unit
+    # use separate scalebar option to adjust scale bar color 
+    axs[1].add_artist(scalebar)
+    image_shape = axs[1].get_images()[0].get_array().shape
+    #get center point from image shape of plot 
+    # or the center is not correct
+    # fft_center  = ( xrdata_fft.z_f_fft.freq_X.shape[0] / 4,  xrdata_fft.z_f_fft.freq_X.shape[0] / 4)
+    # it is not center position
+    if add_guidlines == True : 
+
+        fft_center  = ( image_shape[0] / 2,  image_shape[0] / 2)
+        q0_r = get_px_from_fft_coord(xrdata_fft, xrdata_fft.ref_q0)
+        
+        
+        # Find the index of the close points for Se/Te (q0)
+        from skimage.feature import peak_local_max
+        im = xrdata_fft[ch_name+'_fft'].where(xrdata_fft.mask_ == 1, drop = True).fillna(0).values
+        #z_f_fft_peak.fillna( z_f_fft_peak.min()).values
+        coordinates = peak_local_max(im, min_distance= peak_detection_min_distance)
+        #coordinates ==> find max 
+        # Calculate distances between the points and the disk
+        distances = np.sqrt((coordinates[:, 0] - fft_center[0]) ** 2 + (coordinates[:, 1] - fft_center[1]) ** 2)
+        # distances from fft_center to each points in coordiates 
+
+        distance_to_q0r = distance_to_refq0
+        close_points_indx = np.abs(distances-q0_r.values) < distance_to_q0r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point = coordinates[close_points_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        '''
+        circle_1 = Circle(xy = fft_center, radius= float (q0_r-distance_to_q0r), linestyle='dotted', fill= False, edgecolor = 'blue', alpha =0.1)
+        circle_2 = Circle(xy = fft_center, radius= float (q0_r+distance_to_q0r), linestyle='dotted', fill= False, edgecolor = 'blue', alpha =0.1)
+        axs[1].add_patch(circle_1)
+        axs[1].add_patch(circle_2)
+        '''
+        axs[1].scatter(closest_point[:, 1], closest_point[:, 0], c='blue',marker='o', s = 80 , alpha = 0.3)
+
+        # add circle 
+        circle_q0 = Circle(xy = fft_center, radius= float (q0_r), fill= False, edgecolor = 'blue', alpha =0.5)
+        axs[1].add_patch(circle_q0)
+        text_position = [1, 1]
+        axs[1].annotate(r'$q_{0} (Se/Te)$', (text_position[0]*0.02, text_position[1]*0.14), size=10, color="blue", xycoords="axes fraction")#alpha = 0.3,
+                #bbox=dict(facecolor="white", alpha=0.5, edgecolor="black", linewidth=1))
+            
+            
+        
+        
+        # Find the index of the close points for 1/2 Fe
+        q0_sqrt2_r = q0_r*math.sqrt(2)
+        distance_to_q0sqrt2r = distance_to_refq0
+        close_pointsq0_sqrt2r_indx = np.abs(distances-q0_sqrt2_r.values) < distance_to_q0sqrt2r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point_sqrt2 = coordinates[close_pointsq0_sqrt2r_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        axs[1].scatter(closest_point_sqrt2[:, 1], closest_point_sqrt2[:, 0], c='red',marker='o', s = 80 , alpha = 0.4)
+               
+        circle_sqrt2q0 = Circle(xy = fft_center, radius= float (q0_r)*math.sqrt(2), fill= False, linestyle='dotted', edgecolor = 'red', alpha =0.5)
+        axs[1].add_patch(circle_sqrt2q0)
+
+
+        axs[1].annotate(r'$ \sqrt{2} q_{0} ( \frac{1}{2}$Fe)', (text_position[0]*0.02, text_position[1]*0.88), size=10, color="red", xycoords="axes fraction")
+
+        
+        
+        # Find the index of the close points for 2Fe
+        q0_1over_sqrt2_r = q0_r*math.sqrt(2)/2
+        circle_q0_1over_sqrt2 = Circle(xy = fft_center, radius= float (q0_r)*math.sqrt(2)/2, fill= False, linestyle='dotted', edgecolor = 'orange', alpha =0.7)
+        # Find the index of the close points
+        
+        distance_to_q0_1over_sqrt2r = distance_to_refq0
+        close_pointsq0_1over_sqrt2r_indx = np.abs(distances-q0_1over_sqrt2_r.values) < distance_to_q0_1over_sqrt2r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point_1over_sqrt2 = coordinates[close_pointsq0_1over_sqrt2r_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        axs[1].scatter(closest_point_1over_sqrt2[:, 1], closest_point_1over_sqrt2[:, 0], c='orange',marker='o', s = 80 , alpha = 0.4)
+
+        axs[1].add_patch(circle_q0_1over_sqrt2)
+        
+        axs[1].annotate(r'$ \frac{q_{0}}{\sqrt{2}} ( 2Fe)$', (text_position[0]*0.02, text_position[1]*0.80), size=10, color="orange", xycoords="axes fraction")
+
+        
+        # Find the index of the close points for 2Se/Te
+        q0_1over2_r = q0_r/2
+        circle_q0_1over2 = Circle(xy = fft_center, radius= float (q0_r)/2, fill= False, linestyle='dotted', edgecolor = 'purple', alpha =0.7)
+        axs[1].add_patch(circle_q0_1over2)
+        # Find the index of the close points        
+        distance_to_q0_1over2r = distance_to_refq0
+        close_pointsq0_1over2r_indx = np.abs(distances-q0_1over2_r.values) < distance_to_q0_1over_sqrt2r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point_1over2 = coordinates[close_pointsq0_1over2r_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        axs[1].scatter(closest_point_1over2[:, 1], closest_point_1over2[:, 0], c='purple',marker='o', s = 80 , alpha = 0.4)
+        
+        axs[1].annotate(r'$ \frac{q_{0}}{2} (2Se/Te)$', (text_position[0]*0.02, text_position[1]*0.04), size=10, color="purple", xycoords="axes fraction")
+
+        
+        
+    else: pass
+    plt.tight_layout()
+    plt.show()
+    return 
+
+
+def xrdata_plot_r_q_space_q3_1(xrdata, ch_name= 'z_f',figsize = (6,3),filtering_ratio=[0.3, 2], peak_detection_min_distance=20, distance_to_refq0 = 4, add_guidlines = True, set_aspect='auto'):
+    # 3-1 :  aspect ratio control 
+    # use the equailze hist for real space image
+    # to avoid or control Robust --> interpolate the image first 
+    
+    from matplotlib_scalebar.scalebar import ScaleBar
+    from matplotlib.patches import Circle
+    xrdata_fft = twoD_FFT_xr(xrdata)
+    xrdata_fft_zm = fft_masking_near_q0only (xrdata_fft,ch_name= ch_name+'_fft', filtering_ratio=filtering_ratio)
+
+    
+    fig, axes = plt.subplots (1,2, figsize = figsize)
+    axs = axes.ravel()
+    if 'z_' in ch_name:
+        cmap_r = 'copper'
+        cmap_q = 'Greys'
+    if 'LIX_' in ch_name:
+        cmap_r = 'bwr'
+        cmap_q = 'Blues'
+    
+    if set_aspect != 'auto':
+        ch_image_isns = isns.imshow (xrdata[ch_name], robust = True, ax = axs[0],cmap= cmap_r, dx =xrdata[ch_name].X.X_spacing*1E9, units = "nm", cbar =False )       
+        fig.colorbar (axs[0].imshow(equalize_hist_xr(xrdata)[ch_name].values,cmap= cmap_r), fraction = 0.05 , pad = 0.06)
+        #fig.colorbar(axs.imshow(np.array(z_f_isns.get_children()[0].get_array())), fraction =0.02)
+        axs[0].set_aspect(set_aspect)
+        axs[0].set_title(ch_name)
+    else : 
+        isns.imshow (xrdata[ch_name], robust = True, ax = axs[0],cmap= cmap_r, dx =xrdata[ch_name].X.X_spacing*1E9, units = "nm" )
+        axs[0].set_title(ch_name)
+
+    isns.imgplot(xrdata_fft[ch_name+'_fft'].where(xrdata_fft.mask_ == 1, drop = True), robust = True, ax = axs[1], cmap= cmap_q)
+    axs[1].set_title(ch_name+' (2D FFT)')
+    scalebar = ScaleBar(dx = xrdata_fft.freq_X.spacing*1E-9,
+                        units = "1/nm",
+                        dimension="si-length-reciprocal",    
+                        color='k'                   )
+    # dx = pixel size for scale bar 
+    # 1E-9 for "1/nm" unit
+    # use separate scalebar option to adjust scale bar color 
+    axs[1].add_artist(scalebar)
+    image_shape = axs[1].get_images()[0].get_array().shape
+    #get center point from image shape of plot 
+    # or the center is not correct
+    # fft_center  = ( xrdata_fft.z_f_fft.freq_X.shape[0] / 4,  xrdata_fft.z_f_fft.freq_X.shape[0] / 4)
+    # it is not center position
+    if add_guidlines == True : 
+
+        fft_center  = ( image_shape[0] / 2,  image_shape[0] / 2)
+        q0_r = get_px_from_fft_coord(xrdata_fft, xrdata_fft.ref_q0)
+        
+        
+        # Find the index of the close points for Se/Te (q0)
+        from skimage.feature import peak_local_max
+        im = xrdata_fft[ch_name+'_fft'].where(xrdata_fft.mask_ == 1, drop = True).fillna(0).values
+        #z_f_fft_peak.fillna( z_f_fft_peak.min()).values
+        coordinates = peak_local_max(im, min_distance= peak_detection_min_distance)
+        #coordinates ==> find max 
+        # Calculate distances between the points and the disk
+        distances = np.sqrt((coordinates[:, 0] - fft_center[0]) ** 2 + (coordinates[:, 1] - fft_center[1]) ** 2)
+        # distances from fft_center to each points in coordiates 
+
+        distance_to_q0r = distance_to_refq0
+        close_points_indx = np.abs(distances-q0_r.values) < distance_to_q0r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point = coordinates[close_points_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        '''
+        circle_1 = Circle(xy = fft_center, radius= float (q0_r-distance_to_q0r), linestyle='dotted', fill= False, edgecolor = 'blue', alpha =0.1)
+        circle_2 = Circle(xy = fft_center, radius= float (q0_r+distance_to_q0r), linestyle='dotted', fill= False, edgecolor = 'blue', alpha =0.1)
+        axs[1].add_patch(circle_1)
+        axs[1].add_patch(circle_2)
+        '''
+        axs[1].scatter(closest_point[:, 1], closest_point[:, 0], c='blue',marker='o', s = 80 , alpha = 0.3)
+
+        # add circle 
+        circle_q0 = Circle(xy = fft_center, radius= float (q0_r), fill= False, edgecolor = 'blue', alpha =0.5)
+        axs[1].add_patch(circle_q0)
+        text_position = [1, 1]
+        axs[1].annotate(r'$q_{0} (Se/Te)$', (text_position[0]*0.02, text_position[1]*0.14), size=10, color="blue", xycoords="axes fraction")#alpha = 0.3,
+                #bbox=dict(facecolor="white", alpha=0.5, edgecolor="black", linewidth=1))
+            
+            
+        
+        
+        # Find the index of the close points for 1/2 Fe
+        q0_sqrt2_r = q0_r*math.sqrt(2)
+        distance_to_q0sqrt2r = distance_to_refq0
+        close_pointsq0_sqrt2r_indx = np.abs(distances-q0_sqrt2_r.values) < distance_to_q0sqrt2r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point_sqrt2 = coordinates[close_pointsq0_sqrt2r_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        axs[1].scatter(closest_point_sqrt2[:, 1], closest_point_sqrt2[:, 0], c='red',marker='o', s = 80 , alpha = 0.4)
+               
+        circle_sqrt2q0 = Circle(xy = fft_center, radius= float (q0_r)*math.sqrt(2), fill= False, linestyle='dotted', edgecolor = 'red', alpha =0.5)
+        axs[1].add_patch(circle_sqrt2q0)
+
+
+        axs[1].annotate(r'$ \sqrt{2} q_{0} ( \frac{1}{2}$Fe)', (text_position[0]*0.02, text_position[1]*0.88), size=10, color="red", xycoords="axes fraction")
+
+        
+        
+        # Find the index of the close points for 2Fe
+        q0_1over_sqrt2_r = q0_r*math.sqrt(2)/2
+        circle_q0_1over_sqrt2 = Circle(xy = fft_center, radius= float (q0_r)*math.sqrt(2)/2, fill= False, linestyle='dotted', edgecolor = 'orange', alpha =0.7)
+        # Find the index of the close points
+        
+        distance_to_q0_1over_sqrt2r = distance_to_refq0
+        close_pointsq0_1over_sqrt2r_indx = np.abs(distances-q0_1over_sqrt2_r.values) < distance_to_q0_1over_sqrt2r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point_1over_sqrt2 = coordinates[close_pointsq0_1over_sqrt2r_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        axs[1].scatter(closest_point_1over_sqrt2[:, 1], closest_point_1over_sqrt2[:, 0], c='orange',marker='o', s = 80 , alpha = 0.4)
+
+        axs[1].add_patch(circle_q0_1over_sqrt2)
+        
+        axs[1].annotate(r'$ \frac{q_{0}}{\sqrt{2}} ( 2Fe)$', (text_position[0]*0.02, text_position[1]*0.80), size=10, color="orange", xycoords="axes fraction")
+
+        
+        # Find the index of the close points for 2Se/Te
+        q0_1over2_r = q0_r/2
+        circle_q0_1over2 = Circle(xy = fft_center, radius= float (q0_r)/2, fill= False, linestyle='dotted', edgecolor = 'purple', alpha =0.7)
+        axs[1].add_patch(circle_q0_1over2)
+        # Find the index of the close points        
+        distance_to_q0_1over2r = distance_to_refq0
+        close_pointsq0_1over2r_indx = np.abs(distances-q0_1over2_r.values) < distance_to_q0_1over_sqrt2r
+        #closest_point_index = np.argmin(np.abs(distances-q0_r.values))
+        # distance from the circle 
+        closest_point_1over2 = coordinates[close_pointsq0_1over2r_indx]
+        #closest_point  = peak points that is closed to ref_q0 ( < distance_to_q0r )
+        axs[1].scatter(closest_point_1over2[:, 1], closest_point_1over2[:, 0], c='purple',marker='o', s = 80 , alpha = 0.4)
+        
+        axs[1].annotate(r'$ \frac{q_{0}}{2} (2Se/Te)$', (text_position[0]*0.02, text_position[1]*0.04), size=10, color="purple", xycoords="axes fraction")
+
+        
+        
+    else: pass
+    plt.tight_layout()
+    plt.show()
+    return 
+
 
 # # 9. Line profiles (xr DataSet) 
 #
@@ -2168,7 +2851,7 @@ def line_profile_xr(xrdata, l_pf_start, l_pf_end, ch_N = 0, profile_width = 3):
     if scan_aspect_ratio != 1: 
         fig.colorbar(isns_channels.get_children()[-2],  
                     fraction = 0.045, 
-                    ax = axs[ch_i]) 
+                    ax = axs[ch_i],cmap='viridis') 
     axs[1].plot(np.linspace(0,
                             l_pf_length, 
                             len(l_pf)
@@ -2574,7 +3257,7 @@ else:
     print("The given xr object is neither a DataArray nor a DataSet.")
 
 """
-    
+
 
 # ### threshold map + labeling area 
 #
@@ -2795,6 +3478,8 @@ def xr_isns_plot_r_space(xrdata,
             cmap =  'copper'
         elif 'LIX_' in  i_channels:
             cmap = 'bwr'
+        else: cmap = 'viridis'
+            
         isns_channels = isns.imshow(xrdata[i_channels],
                                     ax =  axs[i],
                                     cbar = cbar_show,
@@ -2804,10 +3489,12 @@ def xr_isns_plot_r_space(xrdata,
                                     robust = True)
         axs[i].set_title(i_channels, loc='left', fontsize = 'small')
         #################################
-        if scan_aspect_ratio != 1: 
-                fig.colorbar(isns_channels.get_children()[-2],  
-                            fraction = 0.045, 
-                            ax = axs[i])  
+        if abs(scan_aspect_ratio -1) > 0.01 : 
+            print( "scan_aspect_ratio = ", scan_aspect_ratio)
+            if scan_aspect_ratio <1: 
+                fig.colorbar(isns_channels.get_children()[-2],
+                             fraction = 0.045, ax = axs[i])  
+            else: pass
         ################################
         # colorbar setting separately 
         ############################## 
@@ -2891,7 +3578,8 @@ def xr_isns_plot_k_space(xrdata_fft,
             cmap = 'Greys'
         elif 'LIX_' in i_channels:
             cmap = 'Blues'
-        
+        else: cmap = 'viridis'
+            
         isns_channels= i_channels+'_isns'
         if i_channels.endswith('fft'): # fft channels 
             dx=(1/size_x)*1E-9
@@ -2913,10 +3601,16 @@ def xr_isns_plot_k_space(xrdata_fft,
                                     robust = True)
         axs[i].set_title(i_channels, loc='left', fontsize = 'small')
         #################################
-        if scan_aspect_ratio != 1: 
+        if abs(scan_aspect_ratio -1) > 0.01 : 
+                print( "scan_aspect_ratio = ", scan_aspect_ratio)
+                if scan_aspect_ratio <1: 
+                    fig.colorbar(isns_channels.get_children()[-2],
+                                 fraction = 0.045, ax = axs[i])  
+                else: pass
+        """if scan_aspect_ratio != 1: 
             fig.colorbar(isns_channels.get_children()[-2],  
-                        fraction = 0.045, 
-                        ax=axs[i])  
+                        fraction = 0.045, cmap = cmap,
+                        ax=axs[i])  """
         ################################
         # colorbar setting separately
         ################################
@@ -3408,6 +4102,60 @@ def xrdata_fft_cmplx_iff(xrdata_fft_cmplx):
 # ### Xr rotation function 
 #
 
+
+
+# # HY's drift correction python convert 
+#
+#
+#
+
+# +
+
+def crop_xrdata(data, crop_size):
+    """
+    Crop the data into 32x32 regions centered around each pixel.
+
+    Parameters:
+    - data (xarray.DataArray): The input data to be cropped.
+    - crop_size (int): The size of the cropping region (e.g., 32).
+
+    Returns:
+    - cropped_data_array (xarray.DataArray): An xarray DataArray containing cropped regions.
+    """
+    
+    # Result list to store cropped data
+    cropped_data_list = []
+
+    for i in range(data.sizes["X"]):
+        for j in range(data.sizes["Y"]):
+            x_center = i
+            y_center = j
+            x_start = x_center - crop_size // 2
+            x_end = x_center + crop_size // 2
+            y_start = y_center - crop_size // 2
+            y_end = y_center + crop_size // 2
+
+            # Ensure x and y indices are within bounds
+            if x_start < 0:
+                x_start = 0
+            if y_start < 0:
+                y_start = 0
+
+            cropped_data = data.isel(X=slice(x_start, x_end), Y=slice(y_start, y_end))
+            cropped_data_list.append(cropped_data)
+
+    # Convert the list to an xarray DataArray
+    cropped_data_array = xr.concat(cropped_data_list, dim="crop")
+
+    return cropped_data_array
+
+# Example usage:
+# cropped_data_array = crop_data(data, crop_size)
+# You can then access cropped regions like cropped_data_array.isel(crop=0)
+
+
+# -
+
 # ### 2D rotation 
 
 ### Xr rotation function 
@@ -3481,11 +4229,140 @@ def rotate_2D_xr (xrdata, rotation_angle):
     # after rotation, replace the padding to rotated image 
     return xrdata_rot
 
-
 # # # More?
 #
 # --
 # ---
+
+# # Drift correction 
+
+
+# ## for Hoyeon's method 
+#
+
+
+
+# +
+## check outliers in Topography 
+## for better background substraction 
+
+
+def find_outlier_indices(series):
+    """
+    Finds the indices of outliers in the given Series using the IQR method.
+
+    Args:
+        series (pandas.Series): The input 1D Series containing potential outliers.
+
+    Returns:
+        pandas.Index: A pandas Index object containing the indices of the outliers.
+    """
+    Q1 = series.quantile(0.25)
+    Q3 = series.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 -8* IQR
+    upper_bound = Q3 +8 * IQR
+    return series[(series < lower_bound) | (series > upper_bound)].index
+
+
+
+# +
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+def perform_polyfit_and_save_difference(topo1Ddf_0, degree=2):
+    """
+    Perform polynomial fitting on the given pandas Series and save the difference
+    between the original data and the fitted polynomial.
+
+    Args:
+        topo1Ddf_0 (pandas.Series): The input pandas Series for polynomial fitting.
+        degree (int): The degree of the polynomial fit (default is 2 for a quadratic fit).
+
+    Returns:
+        pandas.Series: A new pandas Series containing the difference between the original data
+                      and the fitted polynomial.
+    """
+    # Perform polyfit
+    coefficients = np.polyfit(topo1Ddf_0.index, topo1Ddf_0, degree)
+    p = np.poly1d(coefficients)
+
+    # Calculate the difference between the original data and polyfit result
+    topo1Ddf_0_sub_polyfit = topo1Ddf_0 - p(topo1Ddf_0.index)
+
+    # Create a new figure
+    fig, ax = plt.subplots()
+
+    # Plot the original data
+    topo1Ddf_0.plot(ax=ax, label='Original Data')
+
+    # Plot the polyfit result
+    ax.plot(topo1Ddf_0.index, p(topo1Ddf_0.index), color='green', label=f'{degree}th-degree Regression')
+
+    # Set labels and legend
+    ax.set_xlabel('Index')
+    ax.set_ylabel('Value')
+    ax.legend()
+
+    # Show the plot
+    plt.show()
+
+    # Return the difference between original data and polyfit result
+    return topo1Ddf_0_sub_polyfit
+
+# Example usage:
+# Replace topo1Ddf_0 with your pandas Series
+# By calling the function, you will get the topo1Ddf_0_sub_polyfit Series
+
+
+
+# +
+
+def crop_xrdata(data, crop_size):
+    """
+    Crop the data into 32x32 regions centered around each pixel.
+
+    Parameters:
+    - data (xarray.DataArray): The input data to be cropped.
+    - crop_size (int): The size of the cropping region (e.g., 32).
+
+    Returns:
+    - cropped_data_array (xarray.DataArray): An xarray DataArray containing cropped regions.
+    """
+    
+    # Result list to store cropped data
+    cropped_data_list = []
+
+    for i in range(data.sizes["X"]):
+        for j in range(data.sizes["Y"]):
+            x_center = i
+            y_center = j
+            x_start = x_center - crop_size // 2
+            x_end = x_center + crop_size // 2
+            y_start = y_center - crop_size // 2
+            y_end = y_center + crop_size // 2
+
+            # Ensure x and y indices are within bounds
+            if x_start < 0:
+                x_start = 0
+            if y_start < 0:
+                y_start = 0
+
+            cropped_data = data.isel(X=slice(x_start, x_end), Y=slice(y_start, y_end))
+            cropped_data_list.append(cropped_data)
+
+    # Convert the list to an xarray DataArray
+    cropped_data_array = xr.concat(cropped_data_list, dim="crop")
+
+    return cropped_data_array
+
+# Example usage:
+# cropped_data_array = crop_data(data, crop_size)
+# You can then access cropped regions like cropped_data_array.isel(crop=0)
+
+
+# -
 
 # *  drift compensation function. .
 # *  conceptually right. 
@@ -3630,3 +4507,58 @@ def multi4gaussian_fit_pd (pd_df, guess = [1E9, -0.3E-10, 1E-10,
 
 
 
+# -
+
+# # Drift Correction for topography 
+#
+
+# ## how to find step terrace changes 
+# * find outlier at the 1D topo history difference 
+# * for example, tip change make an abrupt Z changes in longterm view 
+#
+
+
+
+# +
+# divide images with given crop_size
+def crop_for_LFFT_xrdata(data, crop_size):
+    """
+    Crop the data into 32x32 regions centered around each pixel.
+
+    Parameters:
+    - data (xarray.DataArray): The input data to be cropped.
+    - crop_size (int): The size of the cropping region (e.g., 32).
+
+    Returns:
+    - cropped_data_array (xarray.DataArray): An xarray DataArray containing cropped regions.
+    """
+    
+    # Result list to store cropped data
+    cropped_data_list = []
+
+    for i in range(data.sizes["X"]):
+        for j in range(data.sizes["Y"]):
+            x_center = i
+            y_center = j
+            x_start = x_center - crop_size // 2
+            x_end = x_center + crop_size // 2
+            y_start = y_center - crop_size // 2
+            y_end = y_center + crop_size // 2
+
+            # Ensure x and y indices are within bounds
+            if x_start < 0:
+                x_start = 0
+            if y_start < 0:
+                y_start = 0
+
+            cropped_data = data.isel(X=slice(x_start, x_end), Y=slice(y_start, y_end))
+            cropped_data_list.append(cropped_data)
+
+    # Convert the list to an xarray DataArray
+    cropped_data_array = xr.concat(cropped_data_list, dim="crop")
+
+    return cropped_data_array
+
+# Example usage:
+# cropped_data_array = crop_data(data, crop_size)
+# You can then access cropped regions like cropped_data_array.isel(crop=0)

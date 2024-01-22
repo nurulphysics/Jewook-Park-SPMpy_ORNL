@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.0
+#       jupytext_version: 1.15.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -1981,7 +1981,7 @@ def rotate_3D_fft_xr (xrdata, rotation_angle):
         x_pad_dim = padding_shape[0]#int(padding_xy[0]*2+xrdata.X.shape[0])
         y_pad_dim = padding_shape[1]#int(padding_xy[0]*2+xrdata.Y.shape[0])
 
-        x_pad_arr =  np.linspace(-1*padding_xy[0]*x_spacing, x_spacing*x_pad_dim,x_pad_dim)
+        x_pad_arr  =  np.linspace(-1*padding_xy[0]*x_spacing, x_spacing*x_pad_dim,x_pad_dim)
         y_pad_arr =  np.linspace(-1*padding_xy[1]*y_spacing, y_spacing*y_pad_dim,y_pad_dim)
 
         # 0 에서 전체 크기 만큼 padding 한결과를 array 만들고 offset 은 pad_x 만큼 
