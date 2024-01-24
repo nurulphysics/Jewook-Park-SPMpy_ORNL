@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.14.5
+#       jupytext_version: 1.15.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -71,7 +71,13 @@
 # * input: gwy_df dataframe & channel number ( N=0)
 #     * pd.DataFrame(_df) $\to $  xarray Dataset (_xr)
 # * output: Xarray DataSet 
-#     
+#
+# ### 5.3. gwy_df2xr : Choose a data channe in gwy_df 
+# * Gwyddion data container to Xarray DataArray
+# * using gwy_df_ch2xr function 
+# * input: gwy_df dataframe
+#     * pd.DataFrame(_df) $\to $  xarray Dataset (_xr)
+# * output: Xarray DataSet 
 #
 
 # ## <font color=blue>0. Choose the working folder </font>
@@ -208,6 +214,126 @@ def files_in_folder(path_input):
                file_list_df[file_list_df['type'] == '3ds'].group.count())
 
     return file_list_df
+
+# +
+import os
+import glob
+import pandas as pd
+import numpy as np
+import nanonispy as nap
+
+def files_in_folder(path_input):
+    """
+    Retrieve file information from a specified folder path.
+
+    Parameters:
+    - path_input (str): 
+    Folder path where files are located.
+    Use 'r' to avoid UnicodeError.
+
+    Returns:
+    - file_list_df (pd.DataFrame): 
+    DataFrame containing information about files in the folder.
+    ---
+    Summary
+    
+    Imports necessary libraries, including os, glob, pandas, numpy, and nanonispy.
+    Gets the current working directory using os.getcwd() and prints it.
+    Changes the working directory to the provided folder path
+    using os.chdir() and prints the new working directory.
+    Uses glob.glob() to find specific types of files 
+    (*.sxm, *.3ds, *.csv, *.gwy, and *.xlsx) 
+    in the folder and stores their filenames in separate lists.
+
+    Creates Pandas DataFrames 
+    (file_list_sxm_df, 
+    file_list_3ds_df,
+    file_list_csv_df,
+    file_list_gwy_df,
+    and file_list_xlsx_df) for each type of file,
+    extracting the group, number, and file name from the filenames.
+
+    Concatenates these DataFrames into a single Pandas DataFrame called file_list_df.
+    Assigns file types based on the file extensions, converting 'lsx' to 'xlsx' for Excel files.
+    Prints information about the files, including the resulting DataFrame.
+    Optionally, it provides additional information about the number of files in each group and the presence of GridSpectroscopy data.
+    Returns the file_list_df DataFrame as the function's output.
+    ---
+    
+    """
+    import os
+    import glob
+    import pandas as pd
+    import numpy as np
+    import nanonispy as nap
+    currentPath = os.getcwd()
+    print("Current Path = ", os.getcwd())
+
+    working_folder = path_input
+    os.chdir(working_folder)
+    print("Changed Path = ", os.getcwd())
+
+    path = "./*"
+    sxm_file_list = (glob.glob('*.sxm'))
+    grid_file_list = (glob.glob('*.3ds'))
+    csv_file_list = (glob.glob('*.csv'))
+    gwy_file_list = (glob.glob('*.gwy'))
+    xlsx_file_list = (glob.glob('*.xlsx'))
+
+    file_list_sxm_df = pd.DataFrame([[
+        file[:-7], file[-7:-4], file]
+                                     for file in sxm_file_list],
+                                    columns=['group', 'num', 'file_name'])
+
+    sxm_file_groups = list(set(file_list_sxm_df['group']))
+
+    file_list_3ds_df = pd.DataFrame([[
+        file[:-7], file[-7:-4], file]
+                                     for file in grid_file_list],
+                                    columns=['group', 'num', 'file_name'])
+
+    file_list_csv_df = pd.DataFrame([[
+        file[:-7], file[-7:-4], file]
+                                    for file in csv_file_list],
+                                   columns=['group', 'num', 'file_name'])
+
+    file_list_gwy_df = pd.DataFrame([[
+        file[:-4], np.nan, file]
+                                    for file in gwy_file_list],
+                                   columns=['group', 'num', 'file_name'])
+
+    file_list_xlsx_df = pd.DataFrame([[
+        file[:-5], np.nan, file]
+                                      for file in xlsx_file_list],
+                                     columns=['group', 'num', 'file_name'])
+
+    file_list_df = pd.concat([file_list_sxm_df, 
+                              file_list_3ds_df, 
+                              file_list_csv_df, 
+                              file_list_gwy_df, 
+                              file_list_xlsx_df],
+                             ignore_index=True)
+    file_list_df['type'] = [file_name[-3:] for file_name in file_list_df.file_name]
+    file_list_df.type[file_list_df.type == 'lsx'] = 'xlsx'
+    print(file_list_df)
+
+    for group in sxm_file_groups:
+        print('sxm file groups: ', group, ': # of files = ',
+              len(file_list_sxm_df[file_list_sxm_df['group'] == group]))
+
+    if len(file_list_df[file_list_df['type'] == '3ds']) == 0:
+        print('No GridSpectroscopy data')
+    else:
+        print('# of GridSpectroscopy',
+              list(set(file_list_df[file_list_df['type'] == '3ds'].group))[0],
+              ' = ',
+              file_list_df[file_list_df['type'] == '3ds'].group.count())
+
+    return file_list_df
+
+
+
+# -
 
 # ## <font color=blue>2. Image to xarray</font>
 
@@ -532,6 +658,29 @@ def img2xr (loading_sxm_file, center_offset = False):
 
 
 def img2xr (loading_sxm_file, center_offset = False):
+    """
+    
+    
+    
+    Convert Nanonis .sxm file data to an xarray dataset.
+
+    Parameters:
+    loading_sxm_file (str): The path to the Nanonis .sxm file to be loaded.
+    center_offset (bool): If True, 
+        adjusts the scan data to center it within the scanner's field of view.
+
+    Returns:
+    xarray.Dataset: An xarray dataset containing the scan data.
+
+    Raises:
+    ModuleNotFoundError: 
+        If required modules (nanonispy, xarray, seaborn-image) are not found, 
+        it attempts to install them.
+
+    Example:
+    >>> data = img2xr('path/to/your/file.sxm', center_offset=True)
+    """
+    
     # updated for multipass 
     # import necessary module 
     import os
@@ -623,8 +772,7 @@ def img2xr (loading_sxm_file, center_offset = False):
     ####################################################
     # check image names --> multi pass? --> rotate? 
     if multipass == True :
-            # image title 
-
+        # image title 
         # multi pass bias voltage in str
         # 'Pass1 fwd @' + str(round(float(Scan.header['multipass-config']['Bias_override_value'][0])*1000,2)) +' mV' +
         # '/ Pass1 bwd @' + str(round(float(Scan.header['multipass-config']['Bias_override_value'][1])*1000,2)) +' mV' +
@@ -1030,6 +1178,59 @@ except ModuleNotFoundError:
 #griddata_file = file_list_df[file_list_df.type=='3ds'].iloc[0].file_name
 
 def grid2xr(griddata_file, center_offset = True): 
+    """
+    An xarray DataSet representing grid data from a Nanonis 3ds file.
+
+    This DataSet contains multiple variables corresponding to different data channels, such as "I_fwd" (Forward Current), "I_bwd" (Backward Current), "LIX_fwd" (Lock-In X Forward), "LIX_bwd" (Lock-In X Backward), and "topography" (Topography). The data is organized along three dimensions: "Y" (Y-coordinate), "X" (X-coordinate), and "bias_mV" (Bias Voltage in mV).
+
+    Attributes:
+        - title (str): A title or description of the grid data.
+        - image_size (list): A list containing the size of the image in X and Y dimensions.
+        - X_spacing (float): The spacing between X-coordinates in nanometers.
+        - Y_spacing (float): The spacing between Y-coordinates in nanometers.
+
+    Additional Information:
+    - The "bias_mV" dimension represents the bias voltage values in mV, and it includes values that are adjusted to have a "zero" bias point.
+    - Depending on the `center_offset` parameter used during conversion, the X and Y coordinates may be adjusted to represent positions in the real scanner field of view or with (0,0) as the origin of the image.
+
+    Example Usage:
+
+    Convert a Nanonis 3ds file to a grid_xr DataSet
+    grid_xr = grid2xr("example.3ds")
+
+    Access data variables
+    topography_data = grid_xr["topography"]
+    forward_current_data = grid_xr["I_fwd"]
+
+    Access attributes
+    title = grid_xr.attrs["title"]
+    image_size = grid_xr.attrs["image_size"]
+    x_spacing = grid_xr.attrs["X_spacing"]
+    y_spacing = grid_xr.attrs["Y_spacing"]
+
+
+    Note: This DataSet is suitable for further analysis, visualization, and manipulation using the xarray library in Python.
+
+
+    ---
+    Summary 
+    
+    Here's a breakdown of the main steps in the grid2xr function:
+    Read the Nanonis 3ds file using NanonisFile and extract relevant information such as grid dimensions, position, size, step sizes, channels (e.g., topography, current), and bias values.
+    Check the topography data and reshape it if necessary. This step is for handling cases where the topography data is not in the expected shape.
+    Process and interpolate bias values to ensure they include "zero" bias and have an odd number of points. This step is necessary to account for different bias settings in the data.
+    Interpolate the current and lock-in data (both forward and backward) to match the new bias values.
+    Create an xarray DataSet named grid_xr with the following variables: "I_fwd," "I_bwd," "LIX_fwd," "LIX_bwd," and "topography." These variables are associated with dimensions "Y," "X," and "bias_mV."
+    Assign various attributes to the grid_xr DataSet, including the title, image size, spacing, and frequency information.
+    Optionally, adjust the scan center position in real scanner field-of-view based on the center_offset parameter.
+    Check and handle cases where the XY dimensions are not equal and may require interpolation.
+    Return the grid_xr DataSet as the result of the function.
+    This function seems to be designed for specific data formats and processing tasks related to Nanonis data. You can call this function with a Nanonis 3ds file as input to convert it into an xarray DataSet with the described attributes and dimensions.
+    
+    ---
+    
+    """
+    
     import re
     file = griddata_file
     #####################
@@ -1455,7 +1656,35 @@ def grid2xr(griddata_file, center_offset = True):
 #
 
 def grid_line2xr(griddata_file, center_offset = True): 
+    """
+    Convert 3D scan data from Nanonis file to an xarray DataSet.
 
+    Parameters:
+        griddata_file (str): The path to the Nanonis file containing the 3D scan data.
+        center_offset (bool, optional): Whether to adjust the scan's center position in real scanner field of view.
+            If True, the scan's center position is moved to the real scanner field of view. If False, the origin (0,0)
+            is set as the image's origin. Default is True.
+
+    Returns:
+        xarray.Dataset: An xarray DataSet containing the scan data with dimensions for X, Y, and bias values.
+            The dataset includes the following variables:
+            - 'I_fwd': Forward current data (3D array with dimensions [Y, X, bias_mV])
+            - 'I_bwd': Backward current data (3D array with dimensions [Y, X, bias_mV])
+            - 'LIX_fwd': Forward lock-in-X data (3D array with dimensions [Y, X, bias_mV])
+            - 'LIX_bwd': Backward lock-in-X data (3D array with dimensions [Y, X, bias_mV])
+            - 'topography': Topography data (2D array with dimensions [Y, X])
+
+        The dataset also includes metadata attributes:
+        - 'title': A descriptive title for the scan data.
+        - 'image_size': The size of the scan image in nanometers [X_size, Y_size].
+        - 'X_spacing': The spacing between X values in nanometers.
+        - 'Y_spacing': The spacing between Y values in nanometers.
+        - 'freq_X_spacing': The reciprocal of X spacing (frequency domain spacing).
+        - 'freq_Y_spacing': The reciprocal of Y spacing in the frequency domain.
+
+    Example:
+        grid_data = grid_line2xr("path/to/grid_data.dat", center_offset=True)
+    """
     file = griddata_file
     #####################
     # conver the given 3ds file
@@ -1852,7 +2081,6 @@ def grid_line2xr(griddata_file, center_offset = True):
     
     return grid_xr
 
-
 # ## <font color=blue>5. Gwyddion 2D image to PANDAS Dataframe or Xarray </font>
 # ### 5.1. gwy_image2df 
 # * convert to df 
@@ -1863,34 +2091,247 @@ def grid_line2xr(griddata_file, center_offset = True):
 #
 
 # +
-def gwy_img2df (gwy_file_name):
-    import pandas as pd
+
+
+def gwy_img2df(gwy_file_name):
+    """
+    Load data from a Gwyddion file and convert it into a Pandas DataFrame.
+
+    Parameters:
+    gwy_file_name (str): The name of the Gwyddion file to be loaded.
+
+    Returns:
+    pd.DataFrame: A Pandas DataFrame containing the data from the Gwyddion file.
+
+    This function loads data from a Gwyddion file specified by `gwy_file_name` and converts
+    it into a Pandas DataFrame. It first checks if the required 'gwyfile' module is installed
+    and installs it if not. The resulting DataFrame contains the data fields from the Gwyddion
+    file.
+    """
     try:
         import gwyfile
     except ModuleNotFoundError:
         warn('ModuleNotFoundError: No module named gwyfile')
         # %pip install gwyfile
         import gwyfile
+
     gwyfile_df = pd.DataFrame(gwyfile.util.get_datafields(gwyfile.load(gwy_file_name)))
-    # convert all gwy file channels to pd.DataFrame
+
+    # Set display format for scientific notation
     pd.set_option('display.float_format', '{:.3e}'.format)
+
     return gwyfile_df
+
 
 #gwy_df = gwyImage2df( file_list_df.file_name[1])
 
-
 # +
-def gwy_df_ch2xr (gwy_df, ch_N=0): 
-    import pandas as pd
-    #convert a channel data to xr DataArray format
-    chN_df = gwy_df.iloc[:,ch_N]
+import pandas as pd
+import xarray as xr
+
+def gwy_df_ch2xr(gwy_df, ch_N=0):
+    """
+    Convert channel data from a Pandas DataFrame to an xarray DataArray format.
+
+    Parameters:
+    gwy_df (pd.DataFrame): The input Pandas DataFrame containing channel data.
+    ch_N (int, optional): The channel index to convert (default is 0).
+
+    Returns:
+    xr.DataArray: An xarray DataArray containing the channel data with proper coordinates.
+    
+    This function takes a DataFrame (`gwy_df`) and an optional `ch_N` parameter to specify
+    which channel to convert into an xarray DataArray format. It reshapes the channel data
+    into a 2D DataFrame, stacks it, and assigns 'Y' and 'X' coordinates with proper scaling.
+    
+    Parameters:
+    - gwy_df (pd.DataFrame): The input Pandas DataFrame containing channel data.
+    - ch_N (int, optional): The channel index to convert (default is 0).
+
+    Returns:
+    - xr.DataArray: An xarray DataArray containing the channel data with proper coordinates.
+
+    This function takes a Pandas DataFrame (`gwy_df`) containing channel data and an optional
+    parameter `ch_N` to specify the channel index to convert. It reshapes the channel data into
+    a 2D DataFrame, stacks it, and assigns 'Y' and 'X' coordinates with proper scaling. The result
+    is returned as an xarray DataArray.
+
+    Example:
+    ch_data = gwy_df_ch2xr(my_dataframe, ch_N=1)
+    print(ch_data)
+    """
+    # Extract the channel data from the DataFrame
+    chN_df = gwy_df.iloc[:, ch_N]
+
+    # Reshape the channel data into a 2D DataFrame and stack it
     chNdf_temp = pd.DataFrame(chN_df.data.reshape((chN_df.yres, chN_df.xres))).stack()
-    chNdf_temp = chNdf_temp.rename_axis (['Y','X'])
-    x_step = chN_df.xreal / chN_df.xres 
-    y_step = chN_df.yreal / chN_df.yres 
+
+    # Rename the indices as 'Y' and 'X'
+    chNdf_temp = chNdf_temp.rename_axis(['Y', 'X'])
+
+    # Calculate the x and y step sizes
+    x_step = chN_df.xreal / chN_df.xres
+    y_step = chN_df.yreal / chN_df.yres
+
+    # Convert the DataFrame to an xarray DataArray
     chNxr = chNdf_temp.to_xarray()
-    chNxr = chNxr.assign_coords(X = chNxr.X.values * x_step, 
-                                Y = chNxr.Y.values * y_step )
+
+    # Assign coordinates 'X' and 'Y' with proper scaling
+    if np.isnan(chN_df['xoff']):
+        chN_df.xoff = 0
+    else : pass
+    if np.isnan(chN_df['yoff']):
+        chN_df.yoff = 0
+    else : pass
+   
+    chNxr = chNxr.assign_coords(X=chNxr.X.values * x_step+chN_df.xoff, Y=chNxr.Y.values * y_step+chN_df.xoff)
+
     return chNxr
 
-# gwy_ch_xr = gwy_df_channel2xr(gwy_df, ch_N=3)
+
+
+# 
+def gwy_df2xr (gwy_df):
+    """
+    Convert a Pandas DataFrame into a dictionary of Xarray DataArrays and Xarray Datasets.
+
+    Parameters:
+    gwy_df (pandas.DataFrame): The input DataFrame to be converted.
+
+    Returns:
+    dict: A dictionary containing Xarray DataArrays and Xarray Datasets.
+
+    This function takes a Pandas DataFrame 'gwy_df' and performs the following steps:
+    1. Extracts unique 'xres' values from the DataFrame.
+    2. Creates a list to store the results.
+    3. Groups the DataFrame by each unique 'xres' value and creates a separate DataFrame for each group.
+    4. Checks if each group has the same 'yres' values; if yes, it appends the group to the results list.
+    5. Initializes an empty dictionary to store Xarray DataArrays and Xarray Datasets.
+    6. Prepares empty Xarray DataArrays and adds them to the dictionary.
+    7. Iterates through the dictionary, creating Xarray Datasets and populating them with converted DataArrays.
+    8. Returns a dictionary containing different-sized Xarray Datasets.
+
+    Note: This function relies on 'gwy_df_ch2xr', which should be defined separately to convert DataFrames to Xarray DataArrays.
+
+    Example:
+    gwy_dict = gwy_df2xr(my_dataframe)
+    for key, value in gwy_dict.items():
+        print(f"Name: {key}, Data: {value}")
+    """
+    # Get unique xres values.
+    unique_xres_values = gwy_df.loc['xres'].unique()
+
+    # Create a list to store the results.
+    result_dfs = []
+    # Create groups for each xres value and create a separate DataFrame for each group.
+    for xres_value in unique_xres_values:
+        group_df = gwy_df[gwy_df.columns[gwy_df.loc['xres'] == xres_value]]
+        # group_df with the same xres
+        unique_yres_values = group_df.loc['yres'].unique()
+        if len(unique_yres_values) == 1:
+            result_dfs.append(group_df)
+    # result_dfs is group_dfs list with different 'xres'
+    # group_dfs = channels with unique xres&yres
+    gwy_xr_dict = {}
+    # prepare empty dictionary for gwy_xrs 
+    # this is because of different X&Y size of eqch group.  
+    for results_df_i in range(1,len(result_dfs)+1):
+        # number of unique groups in result_df 
+
+        gwy_xr_dict[f'gwy_xr{results_df_i}'] = xr.DataArray()
+        #prepare Data Set
+        # Create a dictionary to store empty Xarrays (DataArrays)
+
+
+    for i, gwy_xr_i in enumerate(gwy_xr_dict.keys()):
+        # call each gwy_xrs
+        # use keys() 
+        print(gwy_xr_i)
+        gwy_xr_j  = xr.Dataset()
+        for j, group_df in enumerate(result_dfs[i]):
+            # call group_df from results_dfs
+            print (j)
+            xr_array = gwy_df_ch2xr(result_dfs[i], ch_N=j)
+            gwy_xr_j[result_dfs[i].columns[j]] = xr_array
+            # convert single dataframe, ch_N = j as a xr_array 
+
+            gwy_xr_dict[gwy_xr_i] = gwy_xr_j
+            # save Data array in empty DataSet
+    # Xarray dictionary consist of different size DataSet     
+    return gwy_xr_dict
+
+    
+
+# +
+# Function to rename variable
+def rename_gwy_xr_data_vars(variable):
+    """
+    Rename the data variables in a Dataset object.
+
+    Args:
+    variable: The variable to be renamed.
+
+    Returns:
+    The renamed variable.
+    """
+    # Check if "Corrected" is included
+    if "Corrected" in variable:
+        variable = variable.replace("Corrected", "_C")
+        # Check if "Z" is included
+        if "Z" in variable:
+            # Check if "forward" is included
+            if "Forward" in variable:            
+                # Get the index of the last '_C'.
+                index = variable.rfind("_C")
+                return variable.replace(variable[:index],"z_f")
+            # Check if "backward" is included
+            elif "Backward" in variable:
+                # Get the index of the last '_C'.
+                index = variable.rfind("_C")
+                return variable.replace(variable[:index],"z_b")
+
+        # Check if "LI" is included
+        elif "LI" in variable:
+            # Check if "X" and "forward" are included
+            if "X" in variable : 
+                if "Forward" in variable:
+                    # Get the index of the last '_C'.
+                    index = variable.rfind("_C")
+                    return variable.replace(variable[:index],"LIX_f")
+                if "Backward" in variable:
+                    # Get the index of the last '_C'.
+                    index = variable.rfind("_C")
+                    return variable.replace(variable[:index],"LIX_b")
+            
+            if "Y" in variable : 
+                if "Forward" in variable:
+                    # Get the index of the last '_C'.
+                    index = variable.rfind("_C")
+                    return variable.replace(variable[:index],"LIY_f")
+                if "Backward" in variable:
+                    # Get the index of the last '_C'.
+                    index = variable.rfind("_C")
+                    return variable.replace(variable[:index],"LIY_b")
+        else: return variable
+    else:
+        if "Z" in variable:
+            # Check if "forward" is included
+            if "Forward" in variable:            
+                return variable.replace(variable,"z_f")
+            # Check if "backward" is included
+            elif "Backward" in variable:
+                return variable.replace(variable,"z_b")
+            
+        elif "LI" in variable:
+            # Check if "X" and "forward" are included
+            if "X" in variable : 
+                if "Forward" in variable:
+                    return variable.replace(variable,"LIX_f")
+                if "Backward" in variable:
+                    return variable.replace(variable,"LIX_b")
+        return variable
+
+# Rename the data variables.
+# -
+
+
