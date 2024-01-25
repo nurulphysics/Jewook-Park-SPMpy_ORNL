@@ -24,8 +24,8 @@
 #
 # >  **SPMpy** is an open-source project. (Github: https://github.com/jewook-park/SPMpy_ORNL )
 # > * Contributions, comments, ideas, and error reports are always welcome. Please use the Github page or email parkj1@ornl.gov. Comments & remarks should be in Korean or English. 
-# -
 
+# + [markdown] jp-MarkdownHeadingCollapsed=true
 # # Experimental Conditions 
 #
 # ## Data Acquistion date 
@@ -39,7 +39,13 @@
 # * <font mcolor= Blue, font size="5" > $ Sr_{0.95}Ti_{0.76}Nb_{0.19}Ni_{0.05}O_{3} $thin film </font> (sample #2)
 #     * Thin film after high temperature annealing under $H_{2}$ condition.
 # ## <font color= Blue, font size="5" > **Tip** : PtIr (mechanical cutting)  </font> 
-# ## <font color= Red, font size="5" > Temperature gradient ($T_{tip-sample}$ )  = $T_{tip}$(297K, RT) - $T_{sample}$ (310 K ) = 13 K </font> 
+# ## <font color= Red, font size="5" > Temperature gradient ($ \Delta T = T_{tip-sample}$ )  = $T_{tip}$(297K, RT) - $T_{sample}$ (310 K ) = -13 K </font> 
+#
+# ## <font color= Green, font size="5" > Seebeck coefficient ( $S = - {\Delta V } / {\Delta T}$)  </font> 
+#
+# ## We measures compensation voltage (Vc) $\to$ Vth = -Vc
+#
+# -
 
 # # <font color= orange > 0. Preparation  </font>
 
@@ -338,9 +344,13 @@ gwy_xr
 # -
 gwy_xr.data_vars.keys()
 
+# +
 gwy_xr = gwy_xr.rename_vars( {"Z (fwd)" : 'z_f'})
-gwy_xr = gwy_xr.rename_vars( {"Bias(fwd)" : 'vth_f'})
+gwy_xr = gwy_xr.rename_vars( {"Bias(fwd)" : 'vc_f'})
+gwy_xr = gwy_xr.rename_vars( {"-Bias(fwd)" : 'vth_f'})
+
 gwy_xr
+# -
 
 """
 for ch_i, ch_name in enumerate (gwy_xr.data_vars.keys()):
@@ -433,10 +443,10 @@ sns.kdeplot( data = gwy_df, x = 'z_f', y = 'vth_f', hue =  'Region', levels=10, 
 g= sns.jointplot( data = gwy_df, x = 'z_f', y = 'vth_f', hue =  'Region', s= 20, alpha=0.02, palette = 'coolwarm')
 g.plot_joint(sns.kdeplot, color="r", zorder=0, levels=5, alpha =1,palette = 'vlag')
 g.set_axis_labels(xlabel='Height (nm)', ylabel='Thermovoltage (mV)')
-g.fig.suptitle(r'$\Delta T_{tip-sample}$ = 13 K', x=0.45, y=0.80, fontsize=14)
+g.fig.suptitle(r'$\Delta T_{tip-sample}$ = -13 K', x=0.45, y=0.80, fontsize=14)
 # Figure Level에서 x축과 y축 범위 설정
-g.fig.get_axes()[0].set_xlim(10, 30)  # x축 범위 설정
-g.fig.get_axes()[0].set_ylim(0, 12)   # y축 범위 설정
+g.fig.get_axes()[0].set_xlim(12, 32)  # x축 범위 설정
+g.fig.get_axes()[0].set_ylim(-6, -1)   # y축 범위 설정
 
 
 gwy_df.groupby('Region').z_f.mean()
@@ -453,13 +463,16 @@ gwy_df.groupby('Region').vth_f.std()
 gwy_xr.to_netcdf('RT_vth_1011_xr_dataset.nc')
 gwy_df.to_csv('RT_vth_1011_xr_dataset.csv')
 
+
+
+
 g= sns.jointplot( data = gwy_df, x = 'z_f', y = 'vth_f', hue =  'Region', s= 20, alpha=0.02, palette = 'viridis')
 g.plot_joint(sns.kdeplot, color="r", zorder=0, levels=5, alpha =1,palette = 'viridis')
 g.set_axis_labels(xlabel='Height (nm)', ylabel='Thermovoltage (mV)')
-g.fig.suptitle(r'$\Delta T_{tip-sample}$ = 13 K', x=0.45, y=0.80, fontsize=14)
+g.fig.suptitle(r'$\Delta T_{tip-sample}$ = -13 K', x=0.45, y=0.80, fontsize=14)
 # Figure Level에서 x축과 y축 범위 설정
-g.fig.get_axes()[0].set_xlim(10, 30)  # x축 범위 설정
-g.fig.get_axes()[0].set_ylim(0, 12)   # y축 범위 설정
+g.fig.get_axes()[0].set_xlim(12, 32)  # x축 범위 설정
+g.fig.get_axes()[0].set_ylim(-6, -1)   # y축 범위 설정
 
 
 

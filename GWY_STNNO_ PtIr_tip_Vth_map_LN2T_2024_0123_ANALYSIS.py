@@ -24,14 +24,14 @@
 #
 # >  **SPMpy** is an open-source project. (Github: https://github.com/jewook-park/SPMpy_ORNL )
 # > * Contributions, comments, ideas, and error reports are always welcome. Please use the Github page or email parkj1@ornl.gov. Comments & remarks should be in Korean or English. 
-# -
 
+# + [markdown] jp-MarkdownHeadingCollapsed=true
 # # Experimental Conditions 
 #
 # ## Data Acquistion date 
 # * 2024 0105 Sr0.95Ti0.76Nb0.19Ni0.05O3 thin film with PtIr tip
 # ## Measurement condition 
-# * <font mcolor= Blue, font size="5" > RT + elevated temp 310 K (Temp FB) </font> 
+# * <font mcolor= Blue, font size="5" > RT + cooled temp 103 K (Temp FB) </font> 
 #     * UHV annealing 
 #     * STM measurement at VT STM (JG43,CNMS) UHV condition (<5E-11Torr)
 #
@@ -39,7 +39,14 @@
 # * <font mcolor= Blue, font size="5" > $ Sr_{0.95}Ti_{0.76}Nb_{0.19}Ni_{0.05}O_{3} $thin film </font> (sample #2)
 #     * Thin film after high temperature annealing under $H_{2}$ condition.
 # ## <font color= Blue, font size="5" > **Tip** : PtIr (mechanical cutting)  </font> 
-# ## <font color= Red, font size="5" > Temperature gradient ($T_{tip-sample}$ )  = $T_{tip}$(297K, RT) - $T_{sample}$ (310 K ) = 13 K </font> 
+# ## <font color= Red, font size="5" > Temperature gradient ($ \Delta T = T_{tip-sample}$ )  = $T_{tip}$(103K, RT) - $T_{sample}$ (310 K ) = 194 K </font> 
+#
+# ## <font color= Green, font size="5" > Seebeck coefficient ( $S = - {\Delta V } / {\Delta T}$)  </font> 
+#
+#
+# ## We measures compensation voltage (Vc) $\to$ Vth = -Vc
+#
+# -
 
 # # <font color= orange > 0. Preparation  </font>
 
@@ -338,9 +345,13 @@ gwy_xr
 # -
 gwy_xr.data_vars.keys()
 
+# +
 gwy_xr = gwy_xr.rename_vars( {"Z_(fwd)" : 'z_f'})
-gwy_xr = gwy_xr.rename_vars( {"Bias_(fwd)" : 'vth_f'})
+gwy_xr = gwy_xr.rename_vars( {"Bias_(fwd)" : 'vc_f'})
+gwy_xr = gwy_xr.rename_vars( {"-Bias_(fwd)" : 'vth_f'})
+
 gwy_xr
+# -
 
 """
 for ch_i, ch_name in enumerate (gwy_xr.data_vars.keys()):
@@ -431,18 +442,18 @@ sns.kdeplot( data = gwy_df, x = 'z_f', y = 'vth_f', hue =  'Region', levels=10, 
 g= sns.jointplot( data = gwy_df, x = 'z_f', y = 'vth_f', hue =  'Region', s= 20, alpha=0.02, palette = 'coolwarm')
 g.plot_joint(sns.kdeplot, color="r", zorder=0, levels=5, alpha =1,palette = 'vlag')
 g.set_axis_labels(xlabel='Height (nm)', ylabel='Thermovoltage (mV)')
-g.fig.suptitle(r'$\Delta T_{tip-sample}$ = -194 K', x=0.45, y=0.80, fontsize=14)
+g.fig.suptitle(r'$\Delta T_{tip-sample}$ = +194 K', x=0.45, y=0.80, fontsize=14)
 # Figure Level에서 x축과 y축 범위 설정
 g.fig.get_axes()[0].set_xlim(2, 22)  # x축 범위 설정
-g.fig.get_axes()[0].set_ylim(-60, 0)   # y축 범위 설정
+g.fig.get_axes()[0].set_ylim(0, 60)   # y축 범위 설정
 
 g= sns.jointplot( data = gwy_df, x = 'z_f', y = 'vth_f', hue =  'Region', s= 20, alpha=0.02, palette = 'viridis')
 g.plot_joint(sns.kdeplot, color="r", zorder=0, levels=5, alpha =1,palette = 'viridis')
 g.set_axis_labels(xlabel='Height (nm)', ylabel='Thermovoltage (mV)')
-g.fig.suptitle(r'$\Delta T_{tip-sample}$ = -194 K', x=0.45, y=0.80, fontsize=14)
+g.fig.suptitle(r'$\Delta T_{tip-sample}$ = 194 K', x=0.45, y=0.80, fontsize=14)
 # Figure Level에서 x축과 y축 범위 설정
 g.fig.get_axes()[0].set_xlim(2, 22)  # x축 범위 설정
-g.fig.get_axes()[0].set_ylim(-60, 0)   # y축 범위 설정
+g.fig.get_axes()[0].set_ylim(0, 60)   # y축 범위 설정
 
 
 
